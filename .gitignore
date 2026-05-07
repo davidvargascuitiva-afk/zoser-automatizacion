@@ -1,0 +1,74 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+ENV/
+
+# Build / distribución
+dist/
+build/
+*.egg-info/
+*.spec
+*.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Variables de entorno (NUNCA subir a git)
+.env
+.env.*
+*.env
+
+# Archivos temporales del servidor
+/tmp/
+calificadoria_uploads/
+calificadoria_output/
+
+# Archivos de datos sensibles (no subir plantillas ni archivos de clientes)
+plantilla*.xlsx
+primarios*.xlsx
+fallas*.xlsx
+pruebas_tesis/
+
+# Assets locales de escritorio (no necesarios en el servidor)
+logo_zoser.png
+zoser_icon.ico
+*.lnk
+
+# Archivos de tesis (no forman parte del servidor web)
+gen_*.py
+tesis_*.py
+generar_tesis*.py
+fix_toc*.py
+_fix_*.py
+_run_app.py
+crear_acceso_directo.py
+*.docx
+*.doc
+TESIS_IEEE*.md
+RESUMEN_PROYECTO.md
+Untitled-1.txt
+proyectotesisultima.docx
+
+# Logs
+*.log
+logs/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini

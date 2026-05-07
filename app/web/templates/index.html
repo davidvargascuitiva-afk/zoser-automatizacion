@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automatización — Zoser SAS</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231D4ED8'/%3E%3Cpath d='M6 8h20L8 24h18' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#eff6ff',
+              100: '#dbeafe',
+              200: '#bfdbfe',
+              300: '#93c5fd',
+              400: '#60a5fa',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+              950: '#172554',
+            }
+          },
+          fontFamily: { sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+    .log-box { font-family: 'JetBrains Mono', 'Fira Mono', 'Consolas', monospace; font-size: 12px; }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.45); }
+
+    input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+
+    /* ── Royal blue background ── */
+    .app-bg {
+      background: linear-gradient(145deg, #060E28 0%, #0A1A5C 35%, #1035A0 65%, #1D4ED8 100%);
+    }
+
+    /* ── Logo watermark (large, centered, faint) ── */
+    .logo-watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(75vw, 75vh);
+      height: min(75vw, 75vh);
+      opacity: 0.055;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Dot pattern overlay ── */
+    .bg-dots {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+      background-size: 30px 30px;
+    }
+
+    /* ── All content above background ── */
+    .app-layer {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── White card ── */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.97);
+      border: 1px solid rgba(29, 78, 216, 0.12);
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(6, 14, 40, 0.35), 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    /* ── Inputs ── */
+    .input-field {
+      width: 100%;
+      background: #F0F6FF;
+      border: 1.5px solid #BFDBFE;
+      border-radius: 10px;
+      padding: 10px 13px;
+      font-size: 13.5px;
+      color: #0F172A;
+      transition: all 0.15s;
+      outline: none;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+    .input-field::placeholder { color: #94A3B8; }
+    .input-field:focus {
+      border-color: #1D4ED8;
+      box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.18);
+      background: #fff;
+    }
+
+    .label {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #1E3A8A;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+
+    /* ── Blue solid button ── */
+    .btn-primary {
+      background: linear-gradient(135deg, #1D4ED8 0%, #1E3A8A 100%);
+      box-shadow: 0 4px 18px rgba(10, 22, 40, 0.45);
+      transition: all 0.2s;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+      box-shadow: 0 6px 24px rgba(29, 78, 216, 0.55);
+      transform: translateY(-1px);
+    }
+    .btn-primary:active:not(:disabled) { transform: translateY(0); }
+
+    /* ── Card accent bar ── */
+    .card-accent {
+      width: 3px;
+      height: 18px;
+      background: linear-gradient(180deg, #1D4ED8, #60A5FA);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Progress bar ── */
+    .progress-track { height: 3px; background: rgba(255,255,255,0.12); }
+    .progress-fill {
+      height: 3px;
+      background: linear-gradient(90deg, #60A5FA, #FFFFFF);
+      transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 0 2px 2px 0;
+    }
+
+    /* ── Step pill ── */
+    .step-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 12px 4px 5px; border-radius: 999px;
+      font-size: 12px; font-weight: 600;
+      transition: all 0.18s; cursor: pointer;
+      white-space: nowrap; border: none; background: transparent;
+    }
+    .step-pill-num {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+
+    /* ── File drop zone ── */
+    .file-drop { border: 1.5px dashed #93C5FD; border-radius: 14px; transition: all 0.2s; }
+    .file-drop:hover { border-color: #1D4ED8; background: rgba(29,78,216,0.03); }
+    .file-drop.ready { border-color: #10B981; background: rgba(16,185,129,0.03); border-style: solid; }
+
+    /* ── Spinner ── */
+    @keyframes spin-kf { to { transform: rotate(360deg); } }
+    .spin-anim { animation: spin-kf 0.8s linear infinite; }
+
+    /* ── Selection screen ── */
+    .equipo-card {
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid rgba(255,255,255,0.12);
+      border-radius: 20px;
+      transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .equipo-card.activo {
+      background: rgba(29,78,216,0.18);
+      border-color: rgba(96,165,250,0.3);
+    }
+    .equipo-card.activo:hover {
+      background: rgba(29,78,216,0.30);
+      border-color: #60A5FA;
+      box-shadow: 0 0 0 3px rgba(96,165,250,0.2), 0 24px 48px rgba(6,14,40,0.6);
+      transform: translateY(-7px) scale(1.025);
+    }
+    .equipo-card.bloqueado {
+      background: rgba(255,255,255,0.03);
+      border-color: rgba(255,255,255,0.06);
+      cursor: not-allowed;
+    }
+    .lock-overlay {
+      position: absolute; inset: 0;
+      background: rgba(6,14,40,0.55);
+      border-radius: 18px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 8px;
+      backdrop-filter: blur(2px);
+    }
+    @keyframes fadein { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+    .fadein { animation: fadein 0.5s ease both; }
+    .fadein-d1 { animation-delay: 0.1s; }
+    .fadein-d2 { animation-delay: 0.2s; }
+    .fadein-d3 { animation-delay: 0.3s; }
+    .fadein-d4 { animation-delay: 0.4s; }
+    .fadein-d5 { animation-delay: 0.5s; }
+  </style>
+</head>
+
+<body class="app-bg text-slate-800 overflow-hidden font-sans" x-data="calificador()" x-cloak>
+
+  <!-- ══ BACKGROUND ELEMENTS ══ -->
+
+  <!-- Dot grid -->
+  <div class="bg-dots"></div>
+
+  <!-- Zoser logo watermark — Z shape + "ZOSER" text -->
+  <svg class="logo-watermark" viewBox="0 0 420 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Z letter shape (bold, matching Zoser brand) -->
+    <rect x="10" y="10"  width="280" height="52" rx="8" fill="white"/>
+    <rect x="10" y="258" width="280" height="52" rx="8" fill="white"/>
+    <!-- Z diagonal fill (polygon connecting top-right to bottom-left) -->
+    <polygon points="290,62 10,258 10,310 290,310 290,258 10,62" fill="white"/>
+    <!-- Top-right corner notch to clean the Z shape -->
+    <rect x="10" y="62"  width="280" height="196" fill="none"/>
+    <!-- Circuit trace dots decorative -->
+    <circle cx="50"  cy="36" r="8" fill="white" opacity="0.6"/>
+    <rect   x="46"  cy="55" width="8" height="30" rx="2" fill="white" opacity="0.4"/>
+    <circle cx="246" cy="283" r="8" fill="white" opacity="0.6"/>
+    <rect   x="242" y="258" width="8" height="25" rx="2" fill="white" opacity="0.4"/>
+    <circle cx="46"  cy="97" r="4" fill="white" opacity="0.3"/>
+    <circle cx="46"  cy="117" r="4" fill="white" opacity="0.3"/>
+    <!-- ZOSER text -->
+    <text x="10" y="310" font-family="Arial Black, Arial" font-weight="900"
+          font-size="52" fill="white" letter-spacing="18">
+      ZOSER
+    </text>
+  </svg>
+
+  <!-- ══════════════════════════════════════════════
+       PANTALLA INICIAL — SELECCIÓN DE EQUIPO
+  ══════════════════════════════════════════════ -->
+  <div x-show="!equipoSeleccionado"
+       class="fixed inset-0 z-20 flex flex-col items-center overflow-y-auto px-6 py-8"
+       style="background: linear-gradient(145deg, #060E28 0%, #0A1A5C 35%, #1035A0 65%, #1D4ED8 100%);">
+    <div class="flex flex-col items-center justify-center w-full flex-1">
+
+    <!-- Logo Zoser -->
+    <div class="fadein mb-1 text-center">
+      <div class="inline-flex items-center gap-4 mb-3">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+             style="background:linear-gradient(135deg,#1D4ED8,#3B82F6);
+                    box-shadow:0 6px 28px rgba(29,78,216,0.7);">
+          <svg viewBox="0 0 32 32" class="w-8 h-8" fill="none">
+            <path d="M5 7h22L7 25h20" stroke="white" stroke-width="3.2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="text-left">
+          <p class="font-black text-white leading-none" style="font-size:36px; letter-spacing:0.06em;">ZOSER</p>
+          <p class="text-blue-300 font-semibold leading-none mt-1" style="font-size:10px; letter-spacing:0.2em;">CONFIABILIDAD A SU ALCANCE</p>
+        </div>
+      </div>
+      <div class="w-28 h-0.5 mx-auto rounded-full" style="background:linear-gradient(90deg,transparent,#60A5FA,transparent);"></div>
+    </div>
+
+    <div class="fadein fadein-d1 text-center mb-5">
+      <h2 class="text-white font-bold mb-1" style="font-size:17px;">Sistema de Calificación de Equipos</h2>
+      <p class="text-blue-300 font-medium" style="font-size:12px;">Seleccione el tipo de equipo a calificar</p>
+    </div>
+
+    <!-- Equipment cards -->
+    <div class="grid grid-cols-2 gap-4 w-full" style="max-width:740px;">
+
+      <!-- ══ CÁMARA DE ESTABILIDAD ══ -->
+      <div class="equipo-card activo fadein fadein-d2 p-4 flex flex-col items-center gap-2"
+           @click="equipoSeleccionado = 'camara'">
+        <svg viewBox="0 0 160 175" class="w-36 h-40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#1E3A8A"/>
+              <stop offset="100%" stop-color="#1D4ED8"/>
+            </linearGradient>
+            <linearGradient id="doorGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#0F2D6E"/>
+              <stop offset="100%" stop-color="#0A1628"/>
+            </linearGradient>
+            <linearGradient id="panelGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#0A1A5C"/>
+              <stop offset="100%" stop-color="#060E28"/>
+            </linearGradient>
+          </defs>
+          <!-- Sensor cables on top -->
+          <line x1="30" y1="12" x2="30" y2="4" stroke="#60A5FA" stroke-width="2" stroke-linecap="round"/>
+          <rect x="26" y="0" width="8" height="5" rx="1.5" fill="#1D4ED8" stroke="#60A5FA" stroke-width="0.8"/>
+          <line x1="52" y1="12" x2="52" y2="4" stroke="#60A5FA" stroke-width="2" stroke-linecap="round"/>
+          <rect x="48" y="0" width="8" height="5" rx="1.5" fill="#1D4ED8" stroke="#60A5FA" stroke-width="0.8"/>
+          <line x1="74" y1="12" x2="74" y2="4" stroke="#93C5FD" stroke-width="2" stroke-linecap="round"/>
+          <rect x="70" y="0" width="8" height="5" rx="1.5" fill="#1E40AF" stroke="#93C5FD" stroke-width="0.8"/>
+          <!-- Main body -->
+          <rect x="5" y="12" width="110" height="158" rx="9" fill="url(#bodyGrad)" stroke="#3B82F6" stroke-width="2"/>
+          <!-- Body highlight edge -->
+          <rect x="7" y="14" width="3" height="154" rx="1.5" fill="rgba(255,255,255,0.08)"/>
+          <!-- Glass door area -->
+          <rect x="14" y="20" width="75" height="142" rx="6" fill="url(#doorGrad)" stroke="#3B82F6" stroke-width="1.5"/>
+          <!-- Door glass shine -->
+          <rect x="16" y="22" width="18" height="138" rx="3" fill="rgba(255,255,255,0.04)"/>
+          <!-- Interior glow -->
+          <rect x="16" y="22" width="71" height="138" rx="5" fill="rgba(59,130,246,0.08)"/>
+          <!-- Interior shelves -->
+          <rect x="18" y="80" width="67" height="2.5" rx="1" fill="rgba(96,165,250,0.45)"/>
+          <rect x="18" y="115" width="67" height="2.5" rx="1" fill="rgba(96,165,250,0.45)"/>
+          <rect x="18" y="148" width="67" height="2.5" rx="1" fill="rgba(96,165,250,0.45)"/>
+          <!-- Sample vials on shelf 1 -->
+          <rect x="22" y="60" width="8" height="18" rx="2" fill="rgba(147,197,253,0.4)" stroke="rgba(96,165,250,0.5)" stroke-width="0.8"/>
+          <rect x="33" y="60" width="8" height="18" rx="2" fill="rgba(147,197,253,0.4)" stroke="rgba(96,165,250,0.5)" stroke-width="0.8"/>
+          <rect x="44" y="60" width="8" height="18" rx="2" fill="rgba(147,197,253,0.4)" stroke="rgba(96,165,250,0.5)" stroke-width="0.8"/>
+          <rect x="55" y="64" width="8" height="14" rx="2" fill="rgba(147,197,253,0.3)" stroke="rgba(96,165,250,0.4)" stroke-width="0.8"/>
+          <!-- Sample vials on shelf 2 -->
+          <rect x="22" y="96" width="8" height="17" rx="2" fill="rgba(167,243,208,0.3)" stroke="rgba(52,211,153,0.4)" stroke-width="0.8"/>
+          <rect x="33" y="96" width="8" height="17" rx="2" fill="rgba(167,243,208,0.3)" stroke="rgba(52,211,153,0.4)" stroke-width="0.8"/>
+          <rect x="44" y="99" width="8" height="14" rx="2" fill="rgba(147,197,253,0.3)" stroke="rgba(96,165,250,0.4)" stroke-width="0.8"/>
+          <!-- Gasket seal (door border) -->
+          <rect x="14" y="20" width="75" height="142" rx="6" fill="none" stroke="#1E3A8A" stroke-width="4"/>
+          <rect x="14" y="20" width="75" height="142" rx="6" fill="none" stroke="#3B82F6" stroke-width="1.5"/>
+          <!-- Door handle bar -->
+          <rect x="87" y="82" width="6" height="36" rx="3" fill="#60A5FA"/>
+          <rect x="88" y="84" width="4" height="32" rx="2" fill="rgba(255,255,255,0.3)"/>
+          <!-- Hinge plates -->
+          <rect x="10" y="28" width="5" height="12" rx="1" fill="#1E40AF" stroke="#60A5FA" stroke-width="0.8"/>
+          <circle cx="12.5" cy="34" r="1.5" fill="#60A5FA"/>
+          <rect x="10" y="130" width="5" height="12" rx="1" fill="#1E40AF" stroke="#60A5FA" stroke-width="0.8"/>
+          <circle cx="12.5" cy="136" r="1.5" fill="#60A5FA"/>
+          <!-- Control panel right -->
+          <rect x="120" y="12" width="35" height="158" rx="7" fill="url(#panelGrad)" stroke="#1D4ED8" stroke-width="1.5"/>
+          <!-- Panel highlight -->
+          <rect x="122" y="14" width="2" height="154" rx="1" fill="rgba(255,255,255,0.06)"/>
+          <!-- LCD display -->
+          <rect x="123" y="20" width="29" height="52" rx="4" fill="#060E28" stroke="#3B82F6" stroke-width="1"/>
+          <rect x="125" y="22" width="25" height="48" rx="3" fill="#050A1A"/>
+          <!-- TEMP reading -->
+          <text x="128" y="33" font-size="5.5" fill="#60A5FA" font-family="monospace" font-weight="bold">TEMP</text>
+          <text x="125" y="46" font-size="11" fill="#34D399" font-family="monospace" font-weight="bold">30.0</text>
+          <text x="136" y="54" font-size="5" fill="#60A5FA" font-family="monospace">°C</text>
+          <!-- divider in display -->
+          <line x1="125" y1="57" x2="150" y2="57" stroke="#1D4ED8" stroke-width="0.8"/>
+          <!-- HR reading -->
+          <text x="128" y="64" font-size="5.5" fill="#60A5FA" font-family="monospace" font-weight="bold">%HR</text>
+          <text x="125" y="76" font-size="11" fill="#34D399" font-family="monospace" font-weight="bold">75.0</text>
+          <!-- Buttons area -->
+          <rect x="124" y="80" width="28" height="7" rx="3" fill="#1D4ED8"/>
+          <text x="127" y="86" font-size="5" fill="white" font-family="monospace">▲ TEMP</text>
+          <rect x="124" y="91" width="28" height="7" rx="3" fill="#1E40AF"/>
+          <text x="127" y="97" font-size="5" fill="white" font-family="monospace">▼ TEMP</text>
+          <rect x="124" y="102" width="28" height="7" rx="3" fill="#172554"/>
+          <text x="129" y="108" font-size="5" fill="#93C5FD" font-family="monospace">MENU</text>
+          <!-- LED indicators -->
+          <circle cx="127" cy="120" r="4" fill="#34D399"/>
+          <text x="134" y="123" font-size="5.5" fill="#60A5FA" font-family="monospace">RUN</text>
+          <circle cx="127" cy="132" r="4" fill="#3B82F6"/>
+          <text x="134" y="135" font-size="5.5" fill="#60A5FA" font-family="monospace">LOG</text>
+          <circle cx="127" cy="144" r="4" fill="#1D4ED8"/>
+          <text x="134" y="147" font-size="5.5" fill="#475569" font-family="monospace">ALM</text>
+          <!-- USB port -->
+          <rect x="127" y="152" width="14" height="6" rx="1.5" fill="#172554" stroke="#1D4ED8" stroke-width="0.8"/>
+          <rect x="129" y="153.5" width="10" height="3" rx="0.5" fill="#0A1A5C"/>
+          <!-- Compressor vent bottom -->
+          <rect x="5" y="162" width="110" height="8" rx="0" fill="rgba(10,22,40,0.7)" stroke="none"/>
+          <line x1="13" y1="164" x2="13" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="20" y1="164" x2="20" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="27" y1="164" x2="27" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="34" y1="164" x2="34" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="41" y1="164" x2="41" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="48" y1="164" x2="48" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="55" y1="164" x2="55" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="62" y1="164" x2="62" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="69" y1="164" x2="69" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="76" y1="164" x2="76" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="83" y1="164" x2="83" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="90" y1="164" x2="90" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="97" y1="164" x2="97" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="104" y1="164" x2="104" y2="168" stroke="#1D4ED8" stroke-width="1.5" stroke-linecap="round"/>
+          <!-- Active check badge -->
+          <circle cx="148" cy="22" r="11" fill="#1D4ED8" stroke="#60A5FA" stroke-width="1.5"/>
+          <path d="M141 22l5 5 9-9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="text-center">
+          <p class="font-bold text-white" style="font-size:15px;">Cámara de Estabilidad</p>
+          <p class="text-blue-300 mt-1" style="font-size:11px;">Temperatura y humedad controladas</p>
+        </div>
+        <div class="w-full py-2.5 rounded-xl text-white text-sm font-bold text-center"
+             style="background:linear-gradient(135deg,#2563EB,#1E3A8A);
+                    box-shadow:0 4px 16px rgba(29,78,216,0.5);">
+          Seleccionar →
+        </div>
+      </div>
+
+      <!-- ══ CABINAS ══ -->
+      <div class="equipo-card bloqueado fadein fadein-d3 p-4 flex flex-col items-center gap-2">
+        <svg viewBox="0 0 160 175" class="w-36 h-40 opacity-35" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Cabinet legs -->
+          <rect x="22" y="158" width="14" height="17" rx="2" fill="#475569"/>
+          <rect x="124" y="158" width="14" height="17" rx="2" fill="#475569"/>
+          <!-- Main cabinet body -->
+          <rect x="8" y="30" width="144" height="128" rx="6" fill="#334155" stroke="#475569" stroke-width="2"/>
+          <!-- Top slanted exhaust hood -->
+          <path d="M8 30 Q8 10 30 10 L130 10 Q152 10 152 30 Z" fill="#1E293B" stroke="#475569" stroke-width="1.5"/>
+          <!-- Hood grille (HEPA filter) -->
+          <rect x="20" y="14" width="120" height="14" rx="3" fill="#0F172A" stroke="#334155" stroke-width="1"/>
+          <line x1="28" y1="14" x2="28" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="38" y1="14" x2="38" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="48" y1="14" x2="48" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="58" y1="14" x2="58" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="68" y1="14" x2="68" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="78" y1="14" x2="78" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="88" y1="14" x2="88" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="98" y1="14" x2="98" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="108" y1="14" x2="108" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="118" y1="14" x2="118" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="128" y1="14" x2="128" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <line x1="138" y1="14" x2="138" y2="28" stroke="#475569" stroke-width="0.8"/>
+          <!-- Control panel across top of body -->
+          <rect x="8" y="30" width="144" height="22" rx="0" fill="#1E293B" stroke="#475569" stroke-width="0.8"/>
+          <!-- Control buttons & display -->
+          <rect x="16" y="34" width="30" height="14" rx="3" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+          <text x="19" y="43" font-size="6" fill="#64748B" font-family="monospace">85%</text>
+          <text x="28" y="43" font-size="4.5" fill="#475569" font-family="monospace">UV</text>
+          <circle cx="55" cy="41" r="5" fill="#334155" stroke="#475569" stroke-width="0.8"/>
+          <circle cx="70" cy="41" r="5" fill="#334155" stroke="#475569" stroke-width="0.8"/>
+          <circle cx="85" cy="41" r="5" fill="#334155" stroke="#475569" stroke-width="0.8"/>
+          <circle cx="55" cy="41" r="2" fill="#475569"/>
+          <circle cx="70" cy="41" r="2" fill="#475569"/>
+          <circle cx="85" cy="41" r="2" fill="#475569"/>
+          <rect x="98" y="34" width="18" height="8" rx="2" fill="#64748B"/>
+          <rect x="120" y="34" width="18" height="8" rx="2" fill="#475569"/>
+          <!-- Glass sash (sliding front panel) -->
+          <rect x="15" y="52" width="130" height="68" rx="3" fill="#0F172A" fill-opacity="0.5" stroke="#475569" stroke-width="1.5"/>
+          <!-- Glass shine -->
+          <rect x="17" y="54" width="8" height="64" rx="2" fill="rgba(255,255,255,0.04)"/>
+          <!-- Interior work surface visible through glass -->
+          <rect x="17" y="100" width="126" height="18" rx="2" fill="#334155"/>
+          <!-- UV lamp bar (inside at top) -->
+          <rect x="18" y="56" width="124" height="4" rx="2" fill="#475569"/>
+          <rect x="20" y="57" width="120" height="2" rx="1" fill="#64748B"/>
+          <!-- Airflow arrows -->
+          <text x="72" y="82" font-size="20" fill="rgba(100,116,139,0.4)">↓</text>
+          <!-- Sash handle -->
+          <rect x="62" y="118" width="36" height="5" rx="2.5" fill="#475569"/>
+          <!-- Work surface edge front -->
+          <rect x="8" y="118" width="144" height="10" rx="0" fill="#1E293B" stroke="#334155" stroke-width="0.8"/>
+          <!-- Side vents -->
+          <line x1="8" y1="70" x2="8" y2="90" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+          <line x1="152" y1="70" x2="152" y2="90" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <div class="text-center">
+          <p class="font-bold text-white/45" style="font-size:15px;">Cabinas</p>
+          <p class="text-white/25 mt-1" style="font-size:11px;">Flujo laminar y bioseguridad</p>
+        </div>
+        <div class="lock-overlay">
+          <svg class="w-11 h-11" fill="none" stroke="rgba(255,255,255,0.75)" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          <span class="text-white/75 font-bold text-xs tracking-widest uppercase">Próximamente</span>
+        </div>
+      </div>
+
+      <!-- ══ HORNOS ══ -->
+      <div class="equipo-card bloqueado fadein fadein-d4 p-4 flex flex-col items-center gap-2">
+        <svg viewBox="0 0 160 175" class="w-36 h-40 opacity-35" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Legs/feet -->
+          <rect x="28" y="162" width="16" height="13" rx="2" fill="#475569"/>
+          <rect x="116" y="162" width="16" height="13" rx="2" fill="#475569"/>
+          <!-- Main body -->
+          <rect x="8" y="10" width="144" height="152" rx="8" fill="#1E293B" stroke="#475569" stroke-width="2"/>
+          <!-- Body panel texture (side highlight) -->
+          <rect x="10" y="12" width="4" height="148" rx="2" fill="rgba(255,255,255,0.04)"/>
+          <rect x="146" y="12" width="4" height="148" rx="2" fill="rgba(255,255,255,0.02)"/>
+          <!-- Control panel top section -->
+          <rect x="8" y="10" width="144" height="45" rx="8" fill="#0F172A" stroke="#475569" stroke-width="1"/>
+          <!-- Digital display -->
+          <rect x="16" y="18" width="60" height="30" rx="4" fill="#060E28" stroke="#334155" stroke-width="1"/>
+          <text x="19" y="30" font-size="6" fill="#64748B" font-family="monospace">TEMP ACTUAL</text>
+          <text x="18" y="44" font-size="14" fill="#94A3B8" font-family="monospace" font-weight="bold">200°C</text>
+          <!-- Control knobs -->
+          <circle cx="100" cy="33" r="10" fill="#334155" stroke="#475569" stroke-width="1.5"/>
+          <circle cx="100" cy="33" r="6" fill="#1E293B"/>
+          <line x1="100" y1="23" x2="100" y2="27" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="124" cy="33" r="10" fill="#334155" stroke="#475569" stroke-width="1.5"/>
+          <circle cx="124" cy="33" r="6" fill="#1E293B"/>
+          <line x1="124" y1="23" x2="124" y2="27" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="148" cy="33" r="6" fill="#334155" stroke="#475569" stroke-width="1"/>
+          <circle cx="148" cy="33" r="3" fill="#64748B"/>
+          <!-- Oven door frame -->
+          <rect x="15" y="58" width="130" height="98" rx="5" fill="#334155" stroke="#475569" stroke-width="1.5"/>
+          <!-- Door inner frame / gasket -->
+          <rect x="19" y="62" width="122" height="90" rx="4" fill="#1E293B" stroke="#475569" stroke-width="1"/>
+          <!-- Door window (rectangular tempered glass) -->
+          <rect x="24" y="67" width="112" height="80" rx="3" fill="#0A0F1E" stroke="#334155" stroke-width="0.8"/>
+          <!-- Interior visible through window -->
+          <rect x="26" y="69" width="108" height="76" rx="2" fill="#060E28"/>
+          <!-- Interior walls glow (oven heat orange) -->
+          <rect x="27" y="70" width="106" height="74" rx="2" fill="rgba(180,83,9,0.08)"/>
+          <!-- Heating coil top -->
+          <path d="M32 78 Q42 72 52 78 Q62 84 72 78 Q82 72 92 78 Q102 84 112 78 Q122 72 128 78"
+                stroke="#92400E" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <!-- Heating coil middle -->
+          <path d="M32 100 Q42 94 52 100 Q62 106 72 100 Q82 94 92 100 Q102 106 112 100 Q122 94 128 100"
+                stroke="#92400E" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <!-- Heating coil bottom -->
+          <path d="M32 122 Q42 116 52 122 Q62 128 72 122 Q82 116 92 122 Q102 128 112 122 Q122 116 128 122"
+                stroke="#92400E" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <!-- Oven racks -->
+          <rect x="29" y="110" width="102" height="2" rx="1" fill="rgba(100,116,139,0.5)"/>
+          <rect x="29" y="136" width="102" height="2" rx="1" fill="rgba(100,116,139,0.5)"/>
+          <!-- Door handle bar -->
+          <rect x="22" y="154" width="116" height="6" rx="3" fill="#475569"/>
+          <rect x="24" y="155" width="112" height="4" rx="2" fill="#64748B"/>
+          <!-- Door hinge marks -->
+          <rect x="15" y="66" width="5" height="14" rx="1" fill="#475569"/>
+          <rect x="15" y="130" width="5" height="14" rx="1" fill="#475569"/>
+        </svg>
+        <div class="text-center">
+          <p class="font-bold text-white/45" style="font-size:15px;">Hornos</p>
+          <p class="text-white/25 mt-1" style="font-size:11px;">Alta temperatura y esterilización</p>
+        </div>
+        <div class="lock-overlay">
+          <svg class="w-11 h-11" fill="none" stroke="rgba(255,255,255,0.75)" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          <span class="text-white/75 font-bold text-xs tracking-widest uppercase">Próximamente</span>
+        </div>
+      </div>
+
+      <!-- ══ NEVERAS ══ -->
+      <div class="equipo-card bloqueado fadein fadein-d5 p-4 flex flex-col items-center gap-2">
+        <svg viewBox="0 0 160 175" class="w-36 h-40 opacity-35" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Fridge body -->
+          <rect x="18" y="8" width="124" height="162" rx="10" fill="#1E293B" stroke="#475569" stroke-width="2"/>
+          <!-- Body highlight -->
+          <rect x="20" y="10" width="4" height="158" rx="2" fill="rgba(255,255,255,0.05)"/>
+          <!-- Freezer section top -->
+          <rect x="18" y="8" width="124" height="55" rx="10" fill="#0F172A" stroke="#475569" stroke-width="1.5"/>
+          <rect x="18" y="53" width="124" height="10" rx="0" fill="#0F172A"/>
+          <!-- Freezer glass door -->
+          <rect x="26" y="14" width="108" height="42" rx="5" fill="#060E28" stroke="#334155" stroke-width="1"/>
+          <!-- Freezer interior -->
+          <rect x="28" y="16" width="104" height="38" rx="4" fill="#040810"/>
+          <!-- Ice/frost effect -->
+          <rect x="28" y="16" width="104" height="38" rx="4" fill="rgba(147,197,253,0.06)"/>
+          <!-- Frozen items on shelves -->
+          <rect x="32" y="22" width="22" height="10" rx="2" fill="rgba(147,197,253,0.2)" stroke="rgba(96,165,250,0.3)" stroke-width="0.8"/>
+          <rect x="58" y="22" width="16" height="10" rx="2" fill="rgba(147,197,253,0.15)" stroke="rgba(96,165,250,0.3)" stroke-width="0.8"/>
+          <rect x="78" y="22" width="20" height="10" rx="2" fill="rgba(147,197,253,0.2)" stroke="rgba(96,165,250,0.3)" stroke-width="0.8"/>
+          <rect x="32" y="36" width="30" height="8" rx="2" fill="rgba(147,197,253,0.15)" stroke="rgba(96,165,250,0.25)" stroke-width="0.8"/>
+          <rect x="66" y="36" width="24" height="8" rx="2" fill="rgba(147,197,253,0.15)" stroke="rgba(96,165,250,0.25)" stroke-width="0.8"/>
+          <!-- Snowflake icon -->
+          <path d="M112 26 L112 36 M107 28.5 L117 33.5 M107 33.5 L117 28.5" stroke="#60A5FA" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+          <circle cx="112" cy="26" r="1.5" fill="#93C5FD" opacity="0.6"/>
+          <circle cx="112" cy="36" r="1.5" fill="#93C5FD" opacity="0.6"/>
+          <!-- Freezer handle -->
+          <rect x="100" y="22" width="5" height="16" rx="2.5" fill="#475569"/>
+          <!-- Divider bar between sections -->
+          <rect x="18" y="60" width="124" height="5" rx="0" fill="#334155" stroke="#475569" stroke-width="0.8"/>
+          <!-- Main fridge door (glass) -->
+          <rect x="26" y="68" width="108" height="95" rx="5" fill="#060E28" stroke="#334155" stroke-width="1"/>
+          <!-- Fridge interior -->
+          <rect x="28" y="70" width="104" height="91" rx="4" fill="#040810"/>
+          <!-- Slight blue-white interior light -->
+          <rect x="28" y="70" width="104" height="91" rx="4" fill="rgba(219,234,254,0.04)"/>
+          <!-- Interior light bar -->
+          <rect x="30" y="72" width="100" height="3" rx="1.5" fill="rgba(255,255,255,0.1)"/>
+          <!-- Shelves with items -->
+          <rect x="30" y="90" width="100" height="1.5" rx="0.75" fill="rgba(96,165,250,0.3)"/>
+          <rect x="30" y="110" width="100" height="1.5" rx="0.75" fill="rgba(96,165,250,0.3)"/>
+          <rect x="30" y="130" width="100" height="1.5" rx="0.75" fill="rgba(96,165,250,0.3)"/>
+          <rect x="30" y="150" width="100" height="1.5" rx="0.75" fill="rgba(96,165,250,0.3)"/>
+          <!-- Products on shelves -->
+          <rect x="33" y="76" width="14" height="13" rx="2" fill="rgba(96,165,250,0.2)" stroke="rgba(96,165,250,0.3)" stroke-width="0.8"/>
+          <rect x="50" y="76" width="10" height="13" rx="2" fill="rgba(96,165,250,0.2)" stroke="rgba(96,165,250,0.3)" stroke-width="0.8"/>
+          <rect x="63" y="78" width="16" height="11" rx="2" fill="rgba(167,243,208,0.15)" stroke="rgba(52,211,153,0.25)" stroke-width="0.8"/>
+          <rect x="33" y="93" width="18" height="16" rx="2" fill="rgba(96,165,250,0.15)" stroke="rgba(96,165,250,0.25)" stroke-width="0.8"/>
+          <rect x="55" y="93" width="12" height="16" rx="2" fill="rgba(96,165,250,0.15)" stroke="rgba(96,165,250,0.25)" stroke-width="0.8"/>
+          <rect x="70" y="95" width="20" height="14" rx="2" fill="rgba(167,243,208,0.15)" stroke="rgba(52,211,153,0.25)" stroke-width="0.8"/>
+          <rect x="93" y="95" width="12" height="14" rx="2" fill="rgba(96,165,250,0.12)" stroke="rgba(96,165,250,0.2)" stroke-width="0.8"/>
+          <!-- Temp display on door -->
+          <rect x="33" y="115" width="28" height="14" rx="3" fill="#060E28" stroke="#334155" stroke-width="0.8"/>
+          <text x="36" y="122" font-size="5" fill="#64748B" font-family="monospace">TEMP</text>
+          <text x="35" y="128" font-size="6.5" fill="#94A3B8" font-family="monospace">2-8°C</text>
+          <!-- Fridge handle -->
+          <rect x="110" y="78" width="5" height="40" rx="2.5" fill="#475569"/>
+          <!-- Door hinge -->
+          <rect x="21" y="74" width="6" height="12" rx="1" fill="#475569"/>
+          <rect x="21" y="136" width="6" height="12" rx="1" fill="#475569"/>
+          <!-- Feet -->
+          <rect x="28" y="167" width="18" height="8" rx="2" fill="#475569"/>
+          <rect x="114" y="167" width="18" height="8" rx="2" fill="#475569"/>
+        </svg>
+        <div class="text-center">
+          <p class="font-bold text-white/45" style="font-size:15px;">Neveras</p>
+          <p class="text-white/25 mt-1" style="font-size:11px;">Refrigeración farmacéutica</p>
+        </div>
+        <div class="lock-overlay">
+          <svg class="w-11 h-11" fill="none" stroke="rgba(255,255,255,0.75)" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          <span class="text-white/75 font-bold text-xs tracking-widest uppercase">Próximamente</span>
+        </div>
+      </div>
+
+    </div><!-- /grid -->
+
+    <p class="mt-6 text-white/20 text-xs font-medium tracking-widest">v1.0 · ISO 9001 · ICONTEC SC-CER579294</p>
+
+    </div><!-- /inner flex -->
+  </div><!-- /selection screen -->
+
+
+  <!-- ══ APP LAYER (above background) ══ -->
+  <div x-show="equipoSeleccionado" class="app-layer">
+
+    <!-- ═══════════════════════════════════════
+         TOP NAV
+    ═══════════════════════════════════════ -->
+    <header class="flex-shrink-0"
+            style="background: rgba(6,14,40,0.82); backdrop-filter: blur(16px);
+                   border-bottom: 1px solid rgba(255,255,255,0.1);
+                   box-shadow: 0 4px 28px rgba(0,0,0,0.4);">
+
+      <div class="flex items-center gap-5 px-6 h-[54px]">
+
+        <!-- Brand -->
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+               style="background: linear-gradient(135deg,#1D4ED8,#3B82F6);
+                      box-shadow: 0 3px 12px rgba(29,78,216,0.6);">
+            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none">
+              <path d="M4 5h16L5 19h15" stroke="white" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <p class="font-bold text-white leading-none tracking-widest uppercase"
+               style="font-size:13px;">ZOSER SAS</p>
+            <p class="text-blue-300 leading-none mt-0.5 font-medium"
+               style="font-size:9px; letter-spacing:0.04em;">
+              CalificadorIA · Cámaras de Estabilidad
+            </p>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div class="h-5 w-px flex-shrink-0" style="background:rgba(255,255,255,0.15);"></div>
+
+        <!-- Step pills -->
+        <div class="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto"
+             style="scrollbar-width:none;">
+          <template x-for="(s, i) in steps" :key="i">
+            <button @click="goTo(i)"
+              :class="step === i
+                ? 'text-white'
+                : step > i
+                  ? 'text-blue-300 hover:text-white hover:bg-white/8'
+                  : 'text-white/35 hover:text-white/60'"
+              class="step-pill">
+              <span class="step-pill-num"
+                :class="step > i ? 'bg-blue-500/25 text-blue-300' : step < i ? 'text-white/35' : ''"
+                :style="step === i
+                  ? 'background:linear-gradient(135deg,#60A5FA,#fff); color:#1E3A8A;'
+                  : ''">
+                <template x-if="step > i">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                  </svg>
+                </template>
+                <template x-if="step <= i">
+                  <span x-text="i + 1"
+                    :style="step < i ? 'background:rgba(255,255,255,0.08); width:22px; height:22px; display:flex; align-items:center; justify-content:center; border-radius:50%;' : ''">
+                  </span>
+                </template>
+              </span>
+              <span x-text="s.label" class="hidden md:inline"></span>
+            </button>
+          </template>
+        </div>
+
+        <!-- Counter -->
+        <div class="flex-shrink-0 text-right">
+          <p class="font-bold text-white leading-none" style="font-size:13px;"
+             x-text="`${step + 1} / ${steps.length}`"></p>
+          <p class="text-blue-300 leading-none mt-1 font-medium" style="font-size:9px;">pasos</p>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-track">
+        <div class="progress-fill"
+             :style="`width: ${((step + 1) / steps.length) * 100}%`"></div>
+      </div>
+    </header>
+
+
+    <!-- ═══════════════════════════════════════
+         MAIN
+    ═══════════════════════════════════════ -->
+    <main class="flex-1 overflow-y-auto">
+
+      <!-- Step heading -->
+      <div class="max-w-2xl mx-auto px-6 pt-7 pb-4">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg
+                       text-xs font-bold flex-shrink-0"
+                style="background:linear-gradient(135deg,#60A5FA,#fff); color:#1E3A8A;
+                       box-shadow: 0 3px 12px rgba(29,78,216,0.4);"
+                x-text="step + 1"></span>
+          <h1 class="font-bold text-white tracking-tight"
+              style="font-size:19px; text-shadow: 0 2px 12px rgba(0,0,0,0.4);"
+              x-text="steps[step].title"></h1>
+        </div>
+        <p class="text-sm text-blue-200 font-medium ml-10" x-text="steps[step].subtitle"></p>
+      </div>
+
+      <!-- Cards -->
+      <div class="max-w-2xl mx-auto px-6 pb-6 space-y-4">
+
+
+        <!-- ────────────────────────────────
+             PASO 1: ARCHIVOS
+        ──────────────────────────────── -->
+        <template x-if="step === 0">
+          <div class="space-y-4">
+
+            <div class="glass-card p-6">
+              <div class="flex items-center gap-2.5 mb-5">
+                <div class="card-accent"></div>
+                <p class="text-sm font-semibold text-slate-800">Archivos de entrada</p>
+              </div>
+              <div class="space-y-3">
+                <template x-for="(f, key) in fileFields" :key="key">
+                  <label :for="'file-' + key"
+                    :class="files[key] ? 'file-drop ready' : 'file-drop'"
+                    class="flex items-center gap-4 p-4 cursor-pointer group">
+                    <input :id="'file-' + key" type="file" accept=".xlsx" class="hidden"
+                           @change="uploadFile($event, key)" />
+                    <div :class="files[key]
+                           ? 'bg-emerald-50 border-emerald-200'
+                           : 'bg-blue-50 border-blue-100 group-hover:bg-blue-100/60'"
+                         class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border transition-colors">
+                      <span class="text-xl" x-text="f.icon"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-semibold text-slate-700" x-text="f.label"></p>
+                      <p class="text-xs mt-0.5 truncate"
+                         :class="files[key] ? 'text-emerald-600 font-semibold' : 'text-slate-400'"
+                         x-text="files[key] ? files[key].filename : 'Haz clic para seleccionar archivo .xlsx'"></p>
+                    </div>
+                    <div class="flex-shrink-0">
+                      <template x-if="uploading[key]">
+                        <svg class="spin-anim w-5 h-5 text-brand-600" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                        </svg>
+                      </template>
+                      <template x-if="!uploading[key] && files[key]">
+                        <div class="w-7 h-7 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center">
+                          <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                          </svg>
+                        </div>
+                      </template>
+                      <template x-if="!uploading[key] && !files[key]">
+                        <div class="w-7 h-7 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center
+                                    group-hover:bg-brand-700 group-hover:border-brand-700 transition-colors">
+                          <svg class="w-3.5 h-3.5 text-brand-500 group-hover:text-white transition-colors"
+                               fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                          </svg>
+                        </div>
+                      </template>
+                    </div>
+                  </label>
+                </template>
+              </div>
+            </div>
+
+            <div class="glass-card p-6">
+              <div class="flex items-center gap-2.5 mb-5">
+                <div class="card-accent"></div>
+                <p class="text-sm font-semibold text-slate-800">Sensores instalados en la cámara</p>
+              </div>
+              <div class="flex items-center gap-5">
+                <div class="flex items-center gap-3">
+                  <label class="label" style="margin-bottom:0">Total de sensores</label>
+                  <input type="number" x-model="numSensores" min="1" max="25"
+                         class="input-field text-center font-bold text-brand-800"
+                         style="width:72px;" />
+                </div>
+                <div class="flex-1 bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5">
+                  <p class="text-xs text-brand-900">
+                    <span class="font-bold">Nota:</span> Los sensores faltantes se generarán sintéticamente de forma automática.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </template>
+
+
+        <!-- ────────────────────────────────
+             PASO 2: SENSORES
+        ──────────────────────────────── -->
+        <template x-if="step === 1">
+          <div class="space-y-4">
+            <div class="glass-card overflow-hidden">
+              <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="card-accent" style="margin:0"></div>
+                  <p class="text-sm font-semibold text-slate-800">Sensores detectados</p>
+                </div>
+                <span class="text-xs font-semibold text-brand-700 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full"
+                      x-text="`${sensores.length} sensores`"></span>
+              </div>
+              <div class="px-6 py-3 bg-blue-50/60 border-b border-slate-100">
+                <p class="text-xs text-slate-500">
+                  Asigna la posición de cada sensor. Los marcados como
+                  <span class="text-amber-600 font-bold bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md text-[10px]">SIM</span>
+                  serán generados sintéticamente.
+                </p>
+              </div>
+              <div class="grid grid-cols-12 gap-2 px-6 py-2.5 bg-slate-50 text-[10px] font-bold text-brand-800 uppercase tracking-widest border-b border-slate-100">
+                <div class="col-span-4">Referencia / Serial</div>
+                <div class="col-span-3">Nombre en el reporte</div>
+                <div class="col-span-1 text-center">T</div>
+                <div class="col-span-1 text-center">HR</div>
+                <div class="col-span-2 text-center">Posición</div>
+                <div class="col-span-1 text-center">Usar</div>
+              </div>
+              <div class="divide-y divide-slate-100">
+                <template x-for="(s, i) in sensores" :key="i">
+                  <div class="grid grid-cols-12 gap-2 px-6 py-3 items-center hover:bg-blue-50/30 transition-colors">
+                    <div class="col-span-4 flex items-center gap-1.5">
+                      <span x-show="s.simulado"
+                            class="text-[9px] bg-amber-100 text-amber-700 border border-amber-200 rounded-md px-1.5 py-0.5 font-bold flex-shrink-0">SIM</span>
+                      <input type="text" x-model="s.serial"
+                             :class="s.simulado ? 'border-amber-200 text-amber-700 bg-amber-50/60' : ''"
+                             class="input-field text-xs font-medium"
+                             style="padding:5px 8px;" placeholder="Serial / Referencia" />
+                    </div>
+                    <div class="col-span-3">
+                      <input type="text" x-model="s.nombre" class="input-field text-xs"
+                             style="padding:5px 8px;" placeholder="Modelo" />
+                    </div>
+                    <div class="col-span-1 text-center">
+                      <span :class="s.tiene_temperatura ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300'"
+                            class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold">
+                        <template x-if="s.tiene_temperatura">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                          </svg>
+                        </template>
+                        <template x-if="!s.tiene_temperatura"><span>—</span></template>
+                      </span>
+                    </div>
+                    <div class="col-span-1 text-center">
+                      <span :class="s.tiene_humedad ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300'"
+                            class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold">
+                        <template x-if="s.tiene_humedad">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                          </svg>
+                        </template>
+                        <template x-if="!s.tiene_humedad"><span>—</span></template>
+                      </span>
+                    </div>
+                    <div class="col-span-2 flex justify-center">
+                      <input type="number" x-model="s.posicion" min="1" max="25"
+                             class="input-field text-center font-bold text-brand-800 text-sm"
+                             style="width:60px; padding:6px 8px;" />
+                    </div>
+                    <div class="col-span-1 flex justify-center">
+                      <input type="checkbox" x-model="s.usar"
+                             class="w-4 h-4 rounded border-slate-300 text-brand-700
+                                    focus:ring-brand-500 cursor-pointer accent-brand-700" />
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+
+
+        <!-- ────────────────────────────────
+             PASO 3: CONFIGURACIÓN
+        ──────────────────────────────── -->
+        <template x-if="step === 2">
+          <div class="space-y-4">
+
+            <div class="glass-card p-6">
+              <div class="flex items-center gap-2.5 mb-5">
+                <div class="card-accent"></div>
+                <p class="text-sm font-semibold text-slate-800">Inicio del periodo de 24 horas</p>
+              </div>
+              <div class="flex gap-4">
+                <div class="flex-1">
+                  <label class="label">Fecha</label>
+                  <input type="text" x-model="iniFecha" placeholder="DD/MM/AAAA" class="input-field" />
+                </div>
+                <div style="width:152px;">
+                  <label class="label">Hora</label>
+                  <input type="text" x-model="iniHora" placeholder="HH:MM" class="input-field" />
+                </div>
+              </div>
+            </div>
+
+            <div class="glass-card p-6">
+              <div class="flex items-center gap-2.5 mb-5">
+                <div class="card-accent"></div>
+                <p class="text-sm font-semibold text-slate-800">Prueba de fallas</p>
+              </div>
+              <div class="flex gap-3 mb-4">
+                <button @click="tipoPrueba = 'PO'"
+                  :class="tipoPrueba === 'PO'
+                    ? 'text-white border-transparent shadow-lg'
+                    : 'bg-white text-slate-500 border-slate-200 hover:border-brand-400 hover:text-brand-800'"
+                  :style="tipoPrueba === 'PO' ? 'background:linear-gradient(135deg,#1D4ED8,#1E3A8A);' : ''"
+                  class="flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                  </svg>
+                  PO — Corte de energía
+                </button>
+                <button @click="tipoPrueba = 'PP'"
+                  :class="tipoPrueba === 'PP'
+                    ? 'text-white border-transparent shadow-lg'
+                    : 'bg-white text-slate-500 border-slate-200 hover:border-brand-400 hover:text-brand-800'"
+                  :style="tipoPrueba === 'PP' ? 'background:linear-gradient(135deg,#1D4ED8,#1E3A8A);' : ''"
+                  class="flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                  </svg>
+                  PP — Puerta abierta
+                </button>
+              </div>
+              <div class="flex items-center gap-2 mb-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5">
+                <svg class="w-3.5 h-3.5 text-brand-700 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+                <p class="text-xs text-brand-900 font-medium">
+                  <span x-show="tipoPrueba === 'PO'">30 min corte + 30 min recuperación = 60 registros</span>
+                  <span x-show="tipoPrueba === 'PP'">5 min puerta abierta + 30 min recuperación = 35 registros</span>
+                </p>
+              </div>
+              <div class="flex gap-4">
+                <div class="flex-1">
+                  <label class="label">Fecha inicio falla</label>
+                  <input type="text" x-model="fallaFecha" placeholder="DD/MM/AAAA" class="input-field" />
+                </div>
+                <div style="width:152px;">
+                  <label class="label">Hora</label>
+                  <input type="text" x-model="fallaHora" placeholder="HH:MM" class="input-field" />
+                </div>
+              </div>
+            </div>
+
+            <div class="glass-card p-6">
+              <div class="flex items-center gap-2.5 mb-5">
+                <div class="card-accent"></div>
+                <p class="text-sm font-semibold text-slate-800">Rango operativo del equipo</p>
+              </div>
+              <div class="mb-5">
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <svg class="w-3.5 h-3.5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                  </svg>
+                  Temperatura (°C)
+                </p>
+                <div class="grid grid-cols-3 gap-3">
+                  <div><label class="label">Mínima</label><div class="flex items-center gap-2"><input type="number" x-model="tmin" step="0.1" class="input-field" /><span class="text-xs text-slate-400 font-bold flex-shrink-0">°C</span></div></div>
+                  <div><label class="label">Máxima</label><div class="flex items-center gap-2"><input type="number" x-model="tmax" step="0.1" class="input-field" /><span class="text-xs text-slate-400 font-bold flex-shrink-0">°C</span></div></div>
+                  <div><label class="label">Setpoint</label><div class="flex items-center gap-2"><input type="number" x-model="spTemp" step="0.1" class="input-field font-bold text-brand-800" /><span class="text-xs text-slate-400 font-bold flex-shrink-0">°C</span></div></div>
+                </div>
+              </div>
+              <div class="h-px mb-5" style="background:linear-gradient(90deg,transparent,#BFDBFE,transparent);"></div>
+              <div>
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2C12 2 5 10 5 14a7 7 0 0014 0C19 10 12 2 12 2z"/>
+                  </svg>
+                  Humedad Relativa (%)
+                </p>
+                <div class="grid grid-cols-3 gap-3">
+                  <div><label class="label">Mínima</label><div class="flex items-center gap-2"><input type="number" x-model="hmin" step="0.1" class="input-field" /><span class="text-xs text-slate-400 font-bold flex-shrink-0">%</span></div></div>
+                  <div><label class="label">Máxima</label><div class="flex items-center gap-2"><input type="number" x-model="hmax" step="0.1" class="input-field" /><span class="text-xs text-slate-400 font-bold flex-shrink-0">%</span></div></div>
+                  <div><label class="label">Setpoint</label><div class="flex items-center gap-2"><input type="number" x-model="spHum" step="0.1" class="input-field font-bold text-brand-800" /><span class="text-xs text-slate-400 font-bold flex-shrink-0">%</span></div></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </template>
+
+
+        <!-- ────────────────────────────────
+             PASO 4: EQUIPO
+        ──────────────────────────────── -->
+        <template x-if="step === 3">
+          <div class="space-y-4">
+            <div class="glass-card p-6">
+              <div class="flex items-center gap-2.5 mb-5">
+                <div class="card-accent"></div>
+                <p class="text-sm font-semibold text-slate-800">Identificación del cliente y equipo</p>
+              </div>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                <template x-for="f in equipoFields" :key="f.key">
+                  <div :class="f.key === 'empresa' || f.key === 'ubicacion' ? 'col-span-2' : 'col-span-1'">
+                    <label class="label" x-text="f.label"></label>
+                    <input type="text" :placeholder="f.placeholder" x-model="equipo[f.key]"
+                           class="input-field" />
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div class="glass-card p-6">
+              <div class="flex items-center gap-2.5 mb-4">
+                <div class="card-accent"></div>
+                <p class="text-sm font-semibold text-slate-800">Lectura del controlador del equipo</p>
+              </div>
+              <div class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5 mb-5 flex items-start gap-2">
+                <svg class="w-3.5 h-3.5 text-brand-700 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+                <p class="text-xs text-brand-900">
+                  Temperatura y HR que muestra el controlador al momento del ensayo. Si se omite, se usa el setpoint como referencia.
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div><label class="label">Temp. del controlador</label><div class="flex items-center gap-2"><input type="number" x-model="lecTemp" step="0.1" placeholder="Opcional" class="input-field" /><span class="text-xs text-slate-400 font-bold flex-shrink-0">°C</span></div></div>
+                <div><label class="label">HR del controlador</label><div class="flex items-center gap-2"><input type="number" x-model="lecHum" step="0.1" placeholder="Opcional" class="input-field" /><span class="text-xs text-slate-400 font-bold flex-shrink-0">%</span></div></div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+
+        <!-- ────────────────────────────────
+             PASO 5: GENERAR
+        ──────────────────────────────── -->
+        <template x-if="step === 4">
+          <div class="space-y-4">
+
+            <div class="glass-card overflow-hidden">
+              <div class="px-6 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="card-accent" style="margin:0"></div>
+                  <p class="text-sm font-semibold text-slate-800">Registro de procesamiento</p>
+                </div>
+                <div x-show="generating" class="flex items-center gap-2">
+                  <svg class="spin-anim w-3.5 h-3.5 text-brand-700" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                  </svg>
+                  <span class="text-xs font-bold text-brand-800">Procesando...</span>
+                </div>
+              </div>
+              <div x-ref="logbox" class="log-box h-72 overflow-y-auto p-5 leading-relaxed"
+                   style="background:#0D1117; color:#8B949E;">
+                <template x-if="logs.length === 0 && !generating">
+                  <p style="color:#21262D; font-size:11px;">▶ El registro aparecerá aquí al iniciar la generación...</p>
+                </template>
+                <template x-for="(line, i) in logs" :key="i">
+                  <div :style="
+                    line.includes('✓') ? 'color:#3FB950;' :
+                    line.includes('✗') || line.includes('ERROR') ? 'color:#F85149;' :
+                    line.includes('⚠') ? 'color:#D29922;' :
+                    line.trim() === '' ? 'color:#21262D;' : 'color:#8B949E;'"
+                    x-text="line || ' '">
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <button @click="generate()" :disabled="generating"
+              class="w-full text-white font-bold py-4 rounded-2xl text-base flex items-center justify-center gap-3 btn-primary"
+              :class="generating ? 'opacity-60 cursor-not-allowed' : ''"
+              style="letter-spacing:0.02em;">
+              <template x-if="!generating">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+              </template>
+              <template x-if="generating">
+                <svg class="spin-anim w-5 h-5" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+              </template>
+              <span x-text="generating ? 'Generando reporte...' : 'Generar Reporte Excel'"></span>
+            </button>
+
+            <template x-if="done && success">
+              <div class="glass-card p-5" style="background:rgba(240,253,244,0.97); border-color:rgba(167,243,208,0.8);">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3.5">
+                    <div class="w-11 h-11 rounded-full bg-emerald-100 border-2 border-emerald-200 flex items-center justify-center flex-shrink-0">
+                      <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p class="text-sm font-bold text-emerald-800">Reporte generado exitosamente</p>
+                      <p class="text-xs text-emerald-600 mt-0.5">El archivo está listo para descargar y entregar al cliente.</p>
+                    </div>
+                  </div>
+                  <a :href="'/api/download/' + sessionId"
+                     class="flex items-center gap-2 text-white text-sm font-bold px-5 py-2.5 rounded-xl btn-primary">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Descargar .xlsx
+                  </a>
+                </div>
+              </div>
+            </template>
+
+            <template x-if="done && !success">
+              <div class="glass-card p-5" style="background:rgba(254,242,242,0.97); border-color:rgba(252,165,165,0.6);">
+                <div class="flex items-start gap-3.5">
+                  <div class="w-10 h-10 rounded-full bg-red-100 border-2 border-red-200 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-sm font-bold text-red-700">Error durante la generación</p>
+                    <p class="text-xs text-red-500 mt-0.5">Revisa el registro de procesamiento para más detalles.</p>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+          </div>
+        </template>
+
+
+      </div><!-- /cards -->
+    </main>
+
+
+    <!-- ═══════════════════════════════════════
+         BOTTOM NAV
+    ═══════════════════════════════════════ -->
+    <footer class="flex-shrink-0 flex items-center justify-between px-6 h-[60px]"
+            style="background:rgba(6,14,40,0.82); backdrop-filter:blur(16px);
+                   border-top:1px solid rgba(255,255,255,0.1);
+                   box-shadow:0 -4px 28px rgba(0,0,0,0.4);">
+
+      <button @click="goTo(step - 1)" :disabled="step === 0"
+        class="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold
+               text-white/70 hover:text-white hover:bg-white/10
+               disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+        style="border:1px solid rgba(255,255,255,0.15);">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Anterior
+      </button>
+
+      <!-- Dots -->
+      <div class="flex items-center gap-1.5">
+        <template x-for="(s, i) in steps" :key="i">
+          <button @click="goTo(i)"
+            :class="step === i ? 'w-6 h-2' : 'w-2 h-2 hover:scale-110'"
+            :style="step === i
+              ? 'background:linear-gradient(90deg,#60A5FA,#fff); border-radius:999px;'
+              : step > i
+                ? 'background:rgba(255,255,255,0.55); border-radius:999px;'
+                : 'background:rgba(255,255,255,0.2); border-radius:999px;'"
+            class="transition-all duration-200 rounded-full"></button>
+        </template>
+      </div>
+
+      <div style="min-width:120px; display:flex; justify-content:flex-end;">
+        <button x-show="step < 4" @click="nextStep()" :disabled="detecting"
+          class="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white
+                 disabled:opacity-60 btn-primary transition-all">
+          <span x-text="step === 0 ? (detecting ? 'Detectando...' : 'Siguiente') : 'Siguiente'"></span>
+          <template x-if="detecting">
+            <svg class="spin-anim w-4 h-4" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+          </template>
+          <template x-if="!detecting">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </template>
+        </button>
+        <div x-show="step === 4" style="width:120px;"></div>
+      </div>
+    </footer>
+
+  </div><!-- /app-layer -->
+
+
+  <!-- ═══════════════════════════════════════════
+       ALPINE.JS — LÓGICA (sin cambios)
+  ═══════════════════════════════════════════ -->
+  <script>
+    function calificador() {
+      return {
+        equipoSeleccionado: null,
+        step: 0,
+        steps: [
+          { label: 'Archivos',      title: 'Archivos de entrada',         subtitle: 'Carga los tres archivos Excel requeridos' },
+          { label: 'Sensores',      title: 'Configuración de sensores',    subtitle: 'Asigna la posición de cada sensor en la cámara' },
+          { label: 'Configuración', title: 'Parámetros del ensayo',        subtitle: 'Fechas, rangos del equipo y setpoints' },
+          { label: 'Equipo',        title: 'Datos del equipo',             subtitle: 'Información del cliente y del equipo calificado' },
+          { label: 'Generar',       title: 'Generar reporte',              subtitle: 'Genera el Excel final listo para entregar' },
+        ],
+
+        // Paso 1
+        fileFields: {
+          primarios: { label: 'Excel Primarios (.xlsx)',  icon: '📊' },
+          fallas:    { label: 'Excel Fallas (.xlsx)',     icon: '⚡' },
+          plantilla: { label: 'Plantilla (.xlsx)',        icon: '📋' },
+        },
+        files:       { primarios: null, fallas: null, plantilla: null },
+        uploading:   { primarios: false, fallas: false, plantilla: false },
+        numSensores: 9,
+
+        // Paso 2
+        sensores:  [],
+        detecting: false,
+
+        // Paso 3
+        iniFecha: '', iniHora: '',
+        fallaFecha: '', fallaHora: '',
+        tipoPrueba: 'PO',
+        tmin: '28', tmax: '32',
+        hmin: '70', hmax: '80',
+        spTemp: '30', spHum: '75',
+
+        // Paso 4
+        equipoFields: [
+          { key: 'empresa',   label: 'Empresa / Cliente',   placeholder: 'Nombre de la empresa' },
+          { key: 'marca',     label: 'Marca del equipo',    placeholder: 'Ej: BINDER, Memmert, Thermo' },
+          { key: 'ubicacion', label: 'Ubicación',           placeholder: 'Sala, edificio o área' },
+          { key: 'codigo',    label: 'Código del equipo',   placeholder: 'Código interno de inventario' },
+          { key: 'ensayo',    label: 'N° de Ensayo',        placeholder: 'Ej: B6367-110226' },
+        ],
+        equipo: { empresa: '', marca: '', ubicacion: '', codigo: '', ensayo: '' },
+        lecTemp: '', lecHum: '',
+
+        // Paso 5
+        logs:      [],
+        generating: false,
+        sessionId:  null,
+        done:       false,
+        success:    false,
+
+        // ─── File upload ───────────────────────
+        async uploadFile(event, key) {
+          const file = event.target.files[0]
+          if (!file) return
+          this.uploading[key] = true
+          const fd = new FormData()
+          fd.append('file', file)
+          try {
+            const res  = await fetch('/api/upload', { method: 'POST', body: fd })
+            const data = await res.json()
+            if (data.error) { alert(data.error) }
+            else { this.files[key] = data }
+          } catch (e) { alert('Error al subir el archivo: ' + e.message) }
+          this.uploading[key] = false
+        },
+
+        // ─── Detect sensors ────────────────────
+        async detectSensores() {
+          if (!this.files.primarios) {
+            alert('Selecciona el archivo de Primarios primero.')
+            return
+          }
+          if (!this.files.fallas || !this.files.plantilla) {
+            alert('Selecciona también los archivos de Fallas y Plantilla antes de continuar.')
+            return
+          }
+          this.detecting = true
+          try {
+            const res  = await fetch('/api/detect-sensors', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ruta_primarios: this.files.primarios.path, num_sensores: this.numSensores })
+            })
+            const data = await res.json()
+            if (data.error) { alert('Error al leer sensores: ' + data.error) }
+            else {
+              this.sensores = data.sensores
+              this.step = 1
+            }
+          } catch (e) { alert('Error de conexión: ' + e.message) }
+          this.detecting = false
+        },
+
+        // ─── Generate ──────────────────────────
+        async generate() {
+          this.generating = true
+          this.done = false
+          this.success = false
+          this.logs = []
+
+          const payload = {
+            ruta_primarios: this.files.primarios?.path,
+            ruta_fallas:    this.files.fallas?.path,
+            ruta_plantilla: this.files.plantilla?.path,
+            num_sensores:   this.numSensores,
+            sensores:       this.sensores,
+            ini_fecha:      this.iniFecha,
+            ini_hora:       this.iniHora,
+            falla_fecha:    this.fallaFecha,
+            falla_hora:     this.fallaHora,
+            tipo_prueba:    this.tipoPrueba,
+            tmin: this.tmin, tmax: this.tmax,
+            hmin: this.hmin, hmax: this.hmax,
+            sp_temp: this.spTemp, sp_hum: this.spHum,
+            empresa:    this.equipo.empresa,
+            marca:      this.equipo.marca,
+            ubicacion:  this.equipo.ubicacion,
+            codigo:     this.equipo.codigo,
+            ensayo:     this.equipo.ensayo,
+            lec_temp:   this.lecTemp,
+            lec_hum:    this.lecHum,
+          }
+
+          try {
+            const res = await fetch('/api/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            })
+            const { session_id } = await res.json()
+            this.sessionId = session_id
+
+            const es = new EventSource(`/api/stream/${session_id}`)
+            es.onmessage = (e) => {
+              if (e.data.startsWith('__DONE__:')) {
+                const parts = e.data.split(':')
+                this.success    = parts[2] === '1'
+                this.done       = true
+                this.generating = false
+                es.close()
+              } else {
+                this.logs.push(e.data)
+                this.$nextTick(() => {
+                  const el = this.$refs.logbox
+                  if (el) el.scrollTop = el.scrollHeight
+                })
+              }
+            }
+            es.onerror = () => {
+              this.generating = false
+              this.done = true
+              es.close()
+            }
+          } catch (e) {
+            this.logs.push('✗  Error de conexión: ' + e.message)
+            this.generating = false
+            this.done = true
+          }
+        },
+
+        // ─── Navigation ────────────────────────
+        nextStep() {
+          if (this.step === 0) { this.detectSensores() }
+          else if (this.step < 4) { this.step++ }
+        },
+        goTo(i) {
+          if (i >= 0 && i <= 4) this.step = i
+        },
+      }
+    }
+  </script>
+
+</body>
+</html>
