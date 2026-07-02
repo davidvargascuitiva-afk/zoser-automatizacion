@@ -11,7 +11,7 @@ from app.models.sensor import Sensor
 from app.models.proyecto import ProyectoConfig
 from app.core.parser_primarios import detectar_sensores, cargar_datos_primarios
 from app.core.parser_fallas import cargar_datos_fallas
-from app.core.data_cleaner import limpiar_datos, clip_calificacion
+from app.core.data_cleaner import limpiar_datos, limpiar_primarios, clip_calificacion
 from app.core.data_simulator import simular_sensores_faltantes
 from app.core.excel_writer import llenar_plantilla
 
@@ -173,10 +173,8 @@ def _run_pipeline(sid: str, data: dict):
         sensores = cargar_datos_primarios(config.ruta_primarios, sensores, config.inicio_24h)
         log(f"  {len(sensores)} sensores cargados")
 
-        log('Limpiando valores fuera de rango...')
-        sensores = limpiar_datos(sensores,
-                                  config.rango_temp_min, config.rango_temp_max,
-                                  config.rango_hum_min,  config.rango_hum_max)
+        log('Limpiando errores de sensor (rango amplio para primarios)...')
+        sensores = limpiar_primarios(sensores, config.setpoint_temp, config.setpoint_hum)
 
         timestamps = None
         for s in sensores:

@@ -48,30 +48,109 @@ def _simular_serie(
         drift2 = amp * 0.5 * np.sin(t * 0.3 + rng.uniform(0, 2 * np.pi))
         base = np.full(n, setpoint) + drift + drift2
 
-    # Per-sensor systematic offset (position effect)
     span = max_val - min_val
+
     if es_humedad:
+        # ── Humidity: OU process + dual-frequency oscillation ──────────────────
+        # Rolling-smoothed Gaussian + single slow sine caused multi-hour flat runs
+        # at 0.1 %RH resolution (near sinusoidal peaks slope ≈ 0). Replaced with:
+        # • OU process for natural correlated micro-variation
+        # • Two oscillations (fast compressor + slow environmental) with enough
+        #   amplitude to produce visible step changes every 1-3 readings
+        # • Hard post-processing guarantee: no run > 3 identical rounded values
+
         bias = rng.uniform(-max(span * 0.03, 0.5), max(span * 0.03, 0.5))
-        # Minimum absolute noise so round(v,1) never produces a flat constant line.
-        # span*0.015 fails for tight ranges (e.g. span=4 → noise_std=0.06 → all 75.0).
-        noise_std = max(span * 0.015, 0.35)
+
+        # Ornstein-Uhlenbeck micro-variation (replaces rolling-smoothed Gaussian)
+        ou_theta = 0.18                           # mean-reversion speed
+        ou_sigma = max(span * 0.012, 0.18)        # per-step noise ≥ 0.18 %RH
+        ou = np.zeros(n)
+        for i in range(1, n):
+            ou[i] = ou[i - 1] * (1 - ou_theta) + rng.normal(0, ou_sigma)
+
+        # Primary compressor cycle (10-20 samples ≈ 50-100 min, faster than before)
+        osc_period1 = rng.integers(10, 20)
+        osc_amp1 = max(span * 0.030, 0.55)        # ≥ ±0.55 %RH
+        osc1 = osc_amp1 * np.sin(
+            np.linspace(0, n / osc_period1 * 2 * np.pi, n)
+            + rng.uniform(0, 2 * np.pi)
+        )
+
+        # Secondary slow environmental drift (35-60 samples ≈ 175-300 min)
+        osc_period2 = rng.integers(35, 60)
+        osc_amp2 = max(span * 0.018, 0.30)        # ≥ ±0.30 %RH
+        osc2 = osc_amp2 * np.sin(
+            np.linspace(0, n / osc_period2 * 2 * np.pi, n)
+            + rng.uniform(0, 2 * np.pi)
+        )
+
+        result = np.clip(base + bias + ou + osc1 + osc2, min_val, max_val)
+
+        # Guarantee: no run of > 3 consecutive identical values at 0.1 resolution
+        result_r = np.round(result, 1)
+        run_len = 1
+        for i in range(1, n):
+            if result_r[i] == result_r[i - 1]:
+                run_len += 1
+                if run_len > 3:
+                    step = 0.12 * (1 if rng.random() > 0.5 else -1)
+                    result[i] = float(np.clip(result[i] + step, min_val, max_val))
+                    result_r[i] = round(result[i], 1)
+                    if result_r[i] == result_r[i - 1]:
+                        result[i] = float(np.clip(result[i] - 2 * step, min_val, max_val))
+                        result_r[i] = round(result[i], 1)
+                    run_len = 1
+            else:
+                run_len = 1
+
     else:
+        # ── Temperature: OU + dual oscillation — NUNCA valores lineales ────────
+        # Reemplaza rolling-Gaussian que producía rachas planas a resolución 0.01°C
+        # cuando el span es estrecho (e.g. 3.8°C para rango ±2°C).
         bias = rng.uniform(-max(span * 0.06, 0.15), max(span * 0.06, 0.15))
-        noise_std = max(span * 0.025, 0.10)
 
-    # High-frequency noise
-    noise = rng.normal(0, noise_std, n)
-    # Smooth slightly (rolling 3) — keeps realistic short-term variation
-    noise = pd.Series(noise).rolling(3, min_periods=1, center=True).mean().values
+        # Ornstein-Uhlenbeck micro-variación
+        ou_theta = 0.18
+        ou_sigma = max(span * 0.018, 0.10)   # >= 0.10 °C por paso
+        ou = np.zeros(n)
+        for i in range(1, n):
+            ou[i] = ou[i - 1] * (1 - ou_theta) + rng.normal(0, ou_sigma)
 
-    # Slow oscillation (compressor cycle) unique per sensor
-    osc_period = rng.integers(15, 30)  # 15-30 samples period
-    # Minimum absolute osc amplitude so visible even for narrow ranges
-    osc_amp = max(noise_std * 1.5, 0.3 if es_humedad else 0.08)
-    osc = osc_amp * np.sin(np.linspace(0, n / osc_period * 2 * np.pi, n)
-                           + rng.uniform(0, 2 * np.pi))
+        # Ciclo primario compresor (15-30 muestras)
+        osc_period1 = rng.integers(15, 30)
+        osc_amp1 = max(span * 0.025, 0.12)   # >= ±0.12 °C
+        osc1 = osc_amp1 * np.sin(
+            np.linspace(0, n / osc_period1 * 2 * np.pi, n)
+            + rng.uniform(0, 2 * np.pi)
+        )
 
-    result = np.clip(base + bias + noise + osc, min_val, max_val)
+        # Deriva ambiental lenta (40-70 muestras)
+        osc_period2 = rng.integers(40, 70)
+        osc_amp2 = max(span * 0.015, 0.07)   # >= ±0.07 °C
+        osc2 = osc_amp2 * np.sin(
+            np.linspace(0, n / osc_period2 * 2 * np.pi, n)
+            + rng.uniform(0, 2 * np.pi)
+        )
+
+        result = np.clip(base + bias + ou + osc1 + osc2, min_val, max_val)
+
+        # Garantía: no más de 3 valores consecutivos iguales a resolución 0.02°C
+        result_r = np.round(result, 2)
+        run_len = 1
+        for i in range(1, n):
+            if result_r[i] == result_r[i - 1]:
+                run_len += 1
+                if run_len > 3:
+                    step = 0.08 * (1 if rng.random() > 0.5 else -1)
+                    result[i] = float(np.clip(result[i] + step, min_val, max_val))
+                    result_r[i] = round(result[i], 2)
+                    if result_r[i] == result_r[i - 1]:
+                        result[i] = float(np.clip(result[i] - 2 * step, min_val, max_val))
+                        result_r[i] = round(result[i], 2)
+                    run_len = 1
+            else:
+                run_len = 1
+
     return result
 
 

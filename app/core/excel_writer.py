@@ -489,6 +489,24 @@ def _llenar_hoja_HR(wb, sensores: List[Sensor], timestamps: pd.Series, n: int) -
         ws.cell(row=14, column=tc).value = f'=Primarios!{_cl(hc)}5'
         ws.cell(row=15, column=tc).value = f'=Primarios!{_cl(hc)}6'
 
+    # ── Corregir etiquetas: la plantilla dice TEMPERATURA en la hoja HR ──────────
+    # El template reutiliza la hoja T como base y queda con etiquetas de temperatura.
+    # Se sobreescriben aquí para que la hoja HR siempre muestre "HUMEDAD".
+    _lbl_font = openpyxl.styles.Font(name='Arial', size=8, bold=True)
+    _hr_labels = {
+        306: 'HUMEDAD MÁXIMA',
+        307: 'HUMEDAD MÍNIMA',
+        308: 'HUMEDAD PROMEDIO',
+        309: 'DISTRIBUCIÓN',
+        311: 'HUMEDAD PROMEDIO',
+        312: 'HUMEDAD MÍNIMA',
+        313: 'HUMEDAD MÁXIMA',
+    }
+    for _row, _lbl in _hr_labels.items():
+        _cell = ws.cell(row=_row, column=2)
+        _cell.value = _lbl
+        _cell.font  = _copy_obj(_lbl_font)
+
     # ── Fórmulas de estadísticas por sensor (filas 306-309) ─────────────────────
     last_col  = _cl(_t_data_col(n))
     first_col = _cl(_t_data_col(1))
