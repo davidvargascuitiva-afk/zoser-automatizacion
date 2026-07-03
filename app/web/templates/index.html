@@ -914,6 +914,16 @@
                 <div class="card-accent"></div>
                 <p class="text-sm font-semibold text-slate-800">Inicio del periodo de 24 horas</p>
               </div>
+              <template x-if="rangoPrimarios && rangoPrimarios.desde">
+                <div class="flex items-center gap-2 mb-4 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
+                  <svg class="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                  </svg>
+                  <p class="text-xs text-green-800 font-medium">
+                    Datos disponibles en Primarios: <span class="font-bold" x-text="rangoPrimarios.desde"></span> — <span class="font-bold" x-text="rangoPrimarios.hasta"></span>
+                  </p>
+                </div>
+              </template>
               <div class="flex gap-4">
                 <div class="flex-1">
                   <label class="label">Fecha</label>
@@ -964,6 +974,16 @@
                   <span x-show="tipoPrueba === 'PP'">5 min puerta abierta + 30 min recuperación = 35 registros</span>
                 </p>
               </div>
+              <template x-if="rangoFallas && rangoFallas.desde">
+                <div class="flex items-center gap-2 mb-3 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
+                  <svg class="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                  </svg>
+                  <p class="text-xs text-green-800 font-medium">
+                    Datos disponibles en Fallas: <span class="font-bold" x-text="rangoFallas.desde"></span> — <span class="font-bold" x-text="rangoFallas.hasta"></span>
+                  </p>
+                </div>
+              </template>
               <div class="flex gap-4">
                 <div class="flex-1">
                   <label class="label">Fecha inicio falla</label>
@@ -1248,6 +1268,8 @@
         // Paso 2
         sensores:  [],
         detecting: false,
+        rangoPrimarios: null,
+        rangoFallas:    null,
 
         // Paso 3
         iniFecha: '', iniHora: '',
@@ -1306,12 +1328,14 @@
             const res  = await fetch('/api/detect-sensors', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ruta_primarios: this.files.primarios.path, num_sensores: this.numSensores })
+              body: JSON.stringify({ ruta_primarios: this.files.primarios.path, ruta_fallas: this.files.fallas.path, num_sensores: this.numSensores })
             })
             const data = await res.json()
             if (data.error) { alert('Error al leer sensores: ' + data.error) }
             else {
               this.sensores = data.sensores
+              this.rangoPrimarios = data.rango_primarios
+              this.rangoFallas    = data.rango_fallas
               this.step = 1
             }
           } catch (e) { alert('Error de conexión: ' + e.message) }

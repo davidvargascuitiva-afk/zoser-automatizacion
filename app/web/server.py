@@ -9,8 +9,8 @@ from werkzeug.utils import secure_filename
 
 from app.models.sensor import Sensor
 from app.models.proyecto import ProyectoConfig
-from app.core.parser_primarios import detectar_sensores, cargar_datos_primarios
-from app.core.parser_fallas import cargar_datos_fallas
+from app.core.parser_primarios import detectar_sensores, cargar_datos_primarios, obtener_rango_fechas as rango_primarios
+from app.core.parser_fallas import cargar_datos_fallas, obtener_rango_fechas as rango_fallas
 from app.core.data_cleaner import limpiar_datos, limpiar_primarios, clip_calificacion
 from app.core.data_simulator import simular_sensores_faltantes
 from app.core.excel_writer import llenar_plantilla
@@ -60,10 +60,19 @@ def upload_file():
 #  API — DETECCIÓN DE SENSORES
 # ─────────────────────────────────────────────────────────────────
 
+def _fmt_rango(ts_min, ts_max) -> dict:
+    fmt = '%d/%m/%Y %H:%M'
+    return {
+        'desde': ts_min.strftime(fmt) if ts_min else None,
+        'hasta': ts_max.strftime(fmt) if ts_max else None,
+    }
+
+
 @app.route('/api/detect-sensors', methods=['POST'])
 def detect_sensors():
     data = request.json
     ruta = data.get('ruta_primarios', '')
+    ruta_f = data.get('ruta_fallas', '')
     num = int(data.get('num_sensores', 9))
     try:
         detectados = detectar_sensores(ruta)
@@ -99,7 +108,16 @@ def detect_sensors():
             })
             posiciones.add(pos)
             pos += 1
-        return jsonify({'sensores': result, 'total_archivo': len(detectados)})
+
+        rp_min, rp_max = rango_primarios(ruta)
+        rf_min, rf_max = rango_fallas(ruta_f) if ruta_f else (None, None)
+
+        return jsonify({
+            'sensores': result,
+            'total_archivo': len(detectados),
+            'rango_primarios': _fmt_rango(rp_min, rp_max),
+            'rango_fallas':    _fmt_rango(rf_min, rf_max),
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -165,6 +183,26 @@ def _run_pipeline(sid: str, data: dict):
     try:
         log('Validando configuración...')
         config = _build_config(data)
+
+        # Validar que las fechas ingresadas estén dentro del rango de los archivos
+        rp_min, rp_max = rango_primarios(config.ruta_primarios)
+        if rp_min and rp_max:
+            fin_24h = config.inicio_24h + __import__('datetime').timedelta(hours=24)
+            if config.inicio_24h < rp_min or config.inicio_24h > rp_max:
+                raise ValueError(
+                    f"La fecha de inicio '{config.inicio_24h.strftime('%d/%m/%Y %H:%M')}' "
+                    f"no está en el archivo de Primarios.\n"
+                    f"Rango disponible: {rp_min.strftime('%d/%m/%Y %H:%M')} — {rp_max.strftime('%d/%m/%Y %H:%M')}"
+                )
+
+        rf_min, rf_max = rango_fallas(config.ruta_fallas)
+        if rf_min and rf_max:
+            if config.inicio_falla < rf_min or config.inicio_falla > rf_max:
+                raise ValueError(
+                    f"La fecha de inicio de falla '{config.inicio_falla.strftime('%d/%m/%Y %H:%M')}' "
+                    f"no está en el archivo de Fallas.\n"
+                    f"Rango disponible: {rf_min.strftime('%d/%m/%Y %H:%M')} — {rf_max.strftime('%d/%m/%Y %H:%M')}"
+                )
 
         log('Construyendo lista de sensores...')
         sensores = _build_sensores(data.get('sensores', []))

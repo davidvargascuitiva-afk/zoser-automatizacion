@@ -79,6 +79,25 @@ def detectar_sensores(filepath: str) -> List[Sensor]:
     return sensores
 
 
+def obtener_rango_fechas(filepath: str):
+    """Returns (min_datetime, max_datetime) from the primarios file."""
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+    ws = wb.active
+    timestamps = []
+    for row in ws.iter_rows(min_row=8, values_only=True):
+        fecha_val  = row[0]
+        tiempo_val = row[1] if len(row) > 1 else None
+        if fecha_val is None:
+            continue
+        ts = _extraer_datetime(fecha_val, tiempo_val)
+        if ts is not None:
+            timestamps.append(ts)
+    wb.close()
+    if not timestamps:
+        return None, None
+    return min(timestamps), max(timestamps)
+
+
 def cargar_datos_primarios(
     filepath: str,
     sensores: List[Sensor],
