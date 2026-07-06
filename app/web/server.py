@@ -293,7 +293,7 @@ def _build_config(data: dict) -> ProyectoConfig:
     c.rango_hum_max  = float(data['hmax'])
     c.setpoint_temp  = float(data['sp_temp'])
     c.setpoint_hum   = float(data['sp_hum'])
-    c.num_sensores   = max(1, min(25, int(data.get('num_sensores', 9))))
+    c.num_sensores   = max(1, min(120, int(data.get('num_sensores', 9))))
     c.empresa        = data.get('empresa', '')
     c.marca_equipo   = data.get('marca', '')
     c.ubicacion      = data.get('ubicacion', '')

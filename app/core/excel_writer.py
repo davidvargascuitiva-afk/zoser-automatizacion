@@ -168,6 +168,8 @@ def llenar_plantilla(
     wb.calculation.calcMode = 'auto'
     wb.calculation.fullCalcOnLoad = True
 
+    tipo_plantilla = 'PO' if 'Fallas HR ' in wb.sheetnames else 'PP'
+
     # Expand Análisis if more than 9 sensors — copy row-31 style to new rows
     if n > 9:
         nombre_a = _resolver_sheet(wb, ['Análisis', 'Analisis', 'Análisis'])
@@ -205,12 +207,13 @@ def llenar_plantilla(
 
     sheet_ft = _resolver_sheet(wb, ['Fallas Tem', 'Fallas Tem '])
     sheet_fh = _resolver_sheet(wb, ['Fallas HR', 'Fallas HR '])
+    max_fallas = 60 if config.tipo_prueba == 'PO' else 35
     if sheet_ft:
-        _llenar_fallas(wb, sheet_ft, df_fallas_temp, es_temp=True)
-        _escribir_nombres_fallas(wb, sheet_ft, config.tipo_prueba)
+        _llenar_fallas(wb, sheet_ft, df_fallas_temp, es_temp=True, max_filas=max_fallas)
+        _escribir_nombres_fallas(wb, sheet_ft, tipo_plantilla)
     if sheet_fh:
-        _llenar_fallas(wb, sheet_fh, df_fallas_hum, es_temp=False)
-        _escribir_nombres_fallas(wb, sheet_fh, config.tipo_prueba)
+        _llenar_fallas(wb, sheet_fh, df_fallas_hum, es_temp=False, max_filas=max_fallas)
+        _escribir_nombres_fallas(wb, sheet_fh, tipo_plantilla)
 
     _llenar_analisis(wb, config, n, sensores)
 
@@ -535,15 +538,20 @@ def _llenar_hoja_HR(wb, sensores: List[Sensor], timestamps: pd.Series, n: int) -
 
 def _escribir_nombres_fallas(wb, sheet_name: str, tipo_prueba: str) -> None:
     ws = wb[sheet_name]
-    nombre_fase1 = 'Corte de energía' if tipo_prueba == 'PO' else 'Apertura de puerta'
-    ws.cell(row=2, column=7).value = nombre_fase1
-    ws.cell(row=3, column=7).value = 'Recuperación'
+    if tipo_prueba == 'PO':
+        # POA template: fase1 en fila 2, recuperación en fila 3
+        ws.cell(row=2, column=7).value = 'Corte de energía'
+        ws.cell(row=3, column=7).value = 'Recuperación'
+    else:
+        # PPA template: fase1 en fila 1, recuperación en fila 2
+        ws.cell(row=1, column=7).value = 'Apertura de puerta'
+        ws.cell(row=2, column=7).value = 'Recuperación'
 
 
-def _llenar_fallas(wb, sheet_name: str, df: pd.DataFrame, es_temp: bool) -> None:
+def _llenar_fallas(wb, sheet_name: str, df: pd.DataFrame, es_temp: bool, max_filas: int = MAX_FALLAS) -> None:
     ws = wb[sheet_name]
     for i, (_, fila) in enumerate(df.iterrows()):
-        if i >= MAX_FALLAS:
+        if i >= max_filas:
             break
         row  = FALLAS_ROW_START + i
         cell = ws.cell(row=row, column=2)
@@ -757,39 +765,46 @@ def _llenar_analisis(wb, config: ProyectoConfig, n: int, sensores: List[Sensor])
                 try: ws.cell(row=r, column=c).font = _copy_obj(_row_font)
                 except Exception: pass
 
+    # Helper: skip slave merged cells (PPA template has different merge layout than POA)
+    def _w(r, c, v):
+        from openpyxl.cell.cell import MergedCell as _MC
+        cell = ws.cell(row=r, column=c)
+        if not isinstance(cell, _MC):
+            cell.value = v
+
     # Global avg row
-    ws.cell(row=row_global, column=2).value = '=T!D311'
-    ws.cell(row=row_global, column=8).value = '=HR!D311'
+    _w(row_global, 2, '=T!D311')
+    _w(row_global, 8, '=HR!D311')
 
     # Trecolector temp (row_t_check)
-    ws.cell(row=row_t_check, column=1).value = config.setpoint_temp
-    ws.cell(row=row_t_check, column=2).value = '=T!D311'
-    ws.cell(row=row_t_check, column=3).value = '=T!D312'
-    ws.cell(row=row_t_check, column=4).value = '=T!D313'
-    ws.cell(row=row_t_check, column=5).value = f'=A{row_t_check}-C{row_t_check}'
-    ws.cell(row=row_t_check, column=6).value = f'=D{row_t_check}-A{row_t_check}'
-    ws.cell(row=row_t_check, column=7).value = f'=IF(ABS(E{row_t_check})<2,IF(ABS(F{row_t_check}<2),"SI","NO"),"NO")'
+    _w(row_t_check, 1, config.setpoint_temp)
+    _w(row_t_check, 2, '=T!D311')
+    _w(row_t_check, 3, '=T!D312')
+    _w(row_t_check, 4, '=T!D313')
+    _w(row_t_check, 5, f'=A{row_t_check}-C{row_t_check}')
+    _w(row_t_check, 6, f'=D{row_t_check}-A{row_t_check}')
+    _w(row_t_check, 7, f'=IF(ABS(E{row_t_check})<2,IF(ABS(F{row_t_check}<2),"SI","NO"),"NO")')
 
     # Trecolector HR (row_h_check)
-    ws.cell(row=row_h_check, column=1).value = config.setpoint_hum
-    ws.cell(row=row_h_check, column=2).value = '=HR!D311'
-    ws.cell(row=row_h_check, column=3).value = '=HR!D312'
-    ws.cell(row=row_h_check, column=4).value = '=HR!D313'
-    ws.cell(row=row_h_check, column=5).value = f'=A{row_h_check}-C{row_h_check}'
-    ws.cell(row=row_h_check, column=6).value = f'=D{row_h_check}-A{row_h_check}'
-    ws.cell(row=row_h_check, column=7).value = f'=IF(ABS(E{row_h_check})<5,IF(ABS(F{row_h_check}<5),"SI","NO"),"NO")'
+    _w(row_h_check, 1, config.setpoint_hum)
+    _w(row_h_check, 2, '=HR!D311')
+    _w(row_h_check, 3, '=HR!D312')
+    _w(row_h_check, 4, '=HR!D313')
+    _w(row_h_check, 5, f'=A{row_h_check}-C{row_h_check}')
+    _w(row_h_check, 6, f'=D{row_h_check}-A{row_h_check}')
+    _w(row_h_check, 7, f'=IF(ABS(E{row_h_check})<5,IF(ABS(F{row_h_check}<5),"SI","NO"),"NO")')
 
     # Tabla 5 — temp
-    ws.cell(row=row_t5_t, column=1).value = f'=B23'
-    ws.cell(row=row_t5_t, column=3).value = f'=B{row_t5_t}-A{row_t5_t}'
-    ws.cell(row=row_t5_t, column=4).value = f'=IF(ABS(C{row_t5_t})<1,"SI","NO")'
-    ws.cell(row=row_t5_t, column=2).value = round(float(config.lectura_equipo_temp), 2)
+    _w(row_t5_t, 1, f'=B23')
+    _w(row_t5_t, 3, f'=B{row_t5_t}-A{row_t5_t}')
+    _w(row_t5_t, 4, f'=IF(ABS(C{row_t5_t})<1,"SI","NO")')
+    _w(row_t5_t, 2, round(float(config.lectura_equipo_temp), 2))
 
     # Tabla 5 — HR
-    ws.cell(row=row_t5_h, column=1).value = f'=H23'
-    ws.cell(row=row_t5_h, column=3).value = f'=B{row_t5_h}-A{row_t5_h}'
-    ws.cell(row=row_t5_h, column=4).value = f'=IF(ABS(C{row_t5_h})<1,"SI","NO")'
-    ws.cell(row=row_t5_h, column=2).value = round(float(config.lectura_equipo_hum), 1)
+    _w(row_t5_h, 1, f'=H23')
+    _w(row_t5_h, 3, f'=B{row_t5_h}-A{row_t5_h}')
+    _w(row_t5_h, 4, f'=IF(ABS(C{row_t5_h})<1,"SI","NO")')
+    _w(row_t5_h, 2, round(float(config.lectura_equipo_hum), 1))
 
     # Tabla 6 — localización de puntos críticos
     # Template uses cols B-J (pos+1) for sensors 1-9; extend naturally for N>9.
@@ -799,10 +814,10 @@ def _llenar_analisis(wb, config: ProyectoConfig, n: int, sensores: List[Sensor])
         tc     = _t_data_col(pos)
         col    = _cl(tc)
         t6_col = pos + 1  # B=2 for pos1, K=11 for pos10, L=12 for pos11...
-        ws.cell(row=row_t6_id,  column=t6_col).value = f'={col}14'
-        ws.cell(row=row_t6_ser, column=t6_col).value = f'={col}15'
-        ws.cell(row=row_t6_ta,  column=t6_col).value = f'=T!{col}308'
-        ws.cell(row=row_t6_ha,  column=t6_col).value = f'=HR!{col}308'
+        _w(row_t6_id,  t6_col, f'={col}14')
+        _w(row_t6_ser, t6_col, f'={col}15')
+        _w(row_t6_ta,  t6_col, f'=T!{col}308')
+        _w(row_t6_ha,  t6_col, f'=HR!{col}308')
         # For new sensor columns (beyond original 9), copy border+font style from reference col J
         if pos > 9:
             for row in (row_t6_id, row_t6_ser, row_t6_ta, row_t6_ha):
@@ -814,7 +829,7 @@ def _llenar_analisis(wb, config: ProyectoConfig, n: int, sensores: List[Sensor])
         t6_col = pos + 1
         for row in (row_t6_id, row_t6_ser, row_t6_ta, row_t6_ha):
             try:
-                ws.cell(row=row, column=t6_col).value = None
+                _w(row, t6_col, None)
                 ws.cell(row=row, column=t6_col).border = openpyxl.styles.Border()
             except Exception: pass
 
@@ -829,10 +844,10 @@ def _llenar_analisis(wb, config: ProyectoConfig, n: int, sensores: List[Sensor])
 
     # Update MAX/MIN promedio formulas to cover all N sensors
     last_t6 = _cl(n + 1)
-    ws.cell(row=row_t6_ta + 4, column=2).value = f'=MAX(B{row_t6_ta}:{last_t6}{row_t6_ta})'
-    ws.cell(row=row_t6_ta + 6, column=2).value = f'=MIN(B{row_t6_ta}:{last_t6}{row_t6_ta})'
-    ws.cell(row=row_t6_ha + 8, column=2).value = f'=MAX(B{row_t6_ha}:{last_t6}{row_t6_ha})'
-    ws.cell(row=row_t6_ha + 10, column=2).value = f'=MIN(B{row_t6_ha}:{last_t6}{row_t6_ha})'
+    _w(row_t6_ta + 4,  2, f'=MAX(B{row_t6_ta}:{last_t6}{row_t6_ta})')
+    _w(row_t6_ta + 6,  2, f'=MIN(B{row_t6_ta}:{last_t6}{row_t6_ta})')
+    _w(row_t6_ha + 8,  2, f'=MAX(B{row_t6_ha}:{last_t6}{row_t6_ha})')
+    _w(row_t6_ha + 10, 2, f'=MIN(B{row_t6_ha}:{last_t6}{row_t6_ha})')
 
     # Color extremes in Tabla 6:
     #   Temp más caliente → rojo  | Temp más frío   → azul claro

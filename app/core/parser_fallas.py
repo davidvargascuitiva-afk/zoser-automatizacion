@@ -77,7 +77,7 @@ def cargar_datos_fallas(
 
     df = df[df['timestamp'] >= inicio_falla].reset_index(drop=True)
 
-    num_registros = 60 if tipo_prueba == "PO" else 35
+    num_registros = 60 if tipo_prueba.upper() == "PO" else 35
     df = df.head(num_registros)
 
     df_temp = df[['timestamp', 'temperatura']].rename(columns={'temperatura': 'valor'})
