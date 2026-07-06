@@ -216,13 +216,16 @@ def llenar_plantilla(
 
     sheet_ft = _resolver_sheet(wb, ['Fallas Tem', 'Fallas Tem '])
     sheet_fh = _resolver_sheet(wb, ['Fallas HR', 'Fallas HR '])
-    max_fallas = 60 if config.tipo_prueba == 'PO' else 35
+    max_fallas  = 60 if config.tipo_prueba == 'PO' else 35
+    fase1_filas = 30 if config.tipo_prueba == 'PO' else 5
     if incluir_temp and sheet_ft:
-        _llenar_fallas(wb, sheet_ft, df_fallas_temp, es_temp=True, max_filas=max_fallas)
-        _escribir_nombres_fallas(wb, sheet_ft, tipo_plantilla)
+        _llenar_fallas(wb, sheet_ft, df_fallas_temp, es_temp=True,
+                       max_filas=max_fallas, fase1_filas=fase1_filas)
+        _escribir_nombres_fallas(wb, sheet_ft, tipo_plantilla, config.tipo_prueba)
     if incluir_hum and sheet_fh:
-        _llenar_fallas(wb, sheet_fh, df_fallas_hum, es_temp=False, max_filas=max_fallas)
-        _escribir_nombres_fallas(wb, sheet_fh, tipo_plantilla)
+        _llenar_fallas(wb, sheet_fh, df_fallas_hum, es_temp=False,
+                       max_filas=max_fallas, fase1_filas=fase1_filas)
+        _escribir_nombres_fallas(wb, sheet_fh, tipo_plantilla, config.tipo_prueba)
 
     _llenar_analisis(wb, config, n, sensores, incluir_temp, incluir_hum)
 
@@ -254,6 +257,8 @@ def llenar_plantilla(
 
     _inyectar_cuadros_info(ruta_plantilla, ruta_salida, config)
     _patch_chart_n_sensores(ruta_salida, n, incluir_temp, incluir_hum)
+    _patch_chart_fallas(ruta_salida, sheet_ft, sheet_fh, config, tipo_plantilla,
+                        incluir_temp, incluir_hum)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -593,20 +598,52 @@ def _llenar_hoja_HR(wb, sensores: List[Sensor], timestamps: pd.Series, n: int) -
 #  FALLAS
 # ─────────────────────────────────────────────────────────────────
 
-def _escribir_nombres_fallas(wb, sheet_name: str, tipo_prueba: str) -> None:
+def _escribir_nombres_fallas(wb, sheet_name: str, tipo_plantilla: str, tipo_prueba: str) -> None:
     ws = wb[sheet_name]
-    if tipo_prueba == 'PO':
-        # POA template: fase1 en fila 2, recuperación en fila 3
-        ws.cell(row=2, column=7).value = 'Corte de energía'
+    # La FILA depende de la plantilla subida (POA trae fase1 en fila 2, PPA en
+    # fila 1) — es un detalle de layout del archivo. El TEXTO depende de la
+    # prueba que el usuario realmente seleccionó (tipo_prueba), no de qué
+    # plantilla subió: si sube una plantilla POA pero la prueba es PP, la
+    # etiqueta debe decir "Apertura de puerta", no "Corte de energía".
+    label_fase1 = 'Corte de energía' if tipo_prueba == 'PO' else 'Apertura de puerta'
+    if tipo_plantilla == 'PO':
+        ws.cell(row=2, column=7).value = label_fase1
         ws.cell(row=3, column=7).value = 'Recuperación'
     else:
-        # PPA template: fase1 en fila 1, recuperación en fila 2
-        ws.cell(row=1, column=7).value = 'Apertura de puerta'
+        ws.cell(row=1, column=7).value = label_fase1
         ws.cell(row=2, column=7).value = 'Recuperación'
 
 
-def _llenar_fallas(wb, sheet_name: str, df: pd.DataFrame, es_temp: bool, max_filas: int = MAX_FALLAS) -> None:
+def _llenar_fallas(wb, sheet_name: str, df: pd.DataFrame, es_temp: bool,
+                    max_filas: int = MAX_FALLAS, fase1_filas: int = 30) -> None:
     ws = wb[sheet_name]
+
+    # Colorear la celda de fecha/hora según la fase (falla=rojo, recuperación=
+    # verde), calculado siempre a partir de tipo_prueba — no según lo que
+    # traiga la plantilla subida por el usuario. Esto evita que una plantilla
+    # PP conserve el reparto de filas 30/30 (o cualquier otro) propio de PO,
+    # o deje colores sueltos en filas más allá de las que en realidad se usan.
+    #
+    # El color solo se pinta hasta donde realmente hay datos (filas_reales):
+    # si el archivo de fallas trae menos registros que el máximo teórico
+    # (ej. la recuperación real duró 24 min en vez de 30), las filas sin dato
+    # deben quedar totalmente en blanco — sin color "de más".
+    filas_reales = min(len(df), max_filas)
+    _rojo   = PatternFill(start_color='FFC00000', end_color='FFC00000', fill_type='solid')
+    _verde  = PatternFill(start_color='FF92D050', end_color='FF92D050', fill_type='solid')
+    _sinfill = PatternFill()
+    for i in range(MAX_FALLAS):  # cubre el máximo posible (60) para limpiar filas sobrantes
+        row = FALLAS_ROW_START + i
+        cell = ws.cell(row=row, column=2)
+        if i < filas_reales:
+            cell.fill = _rojo if i < fase1_filas else _verde
+        else:
+            cell.fill = _sinfill
+            # La columna A ("Sample Number") trae una numeración fija 1-60 de
+            # la plantilla — para PP (35 filas) los números 36-60 quedan
+            # visibles sin motivo si no se limpian también.
+            ws.cell(row=row, column=1).value = None
+
     for i, (_, fila) in enumerate(df.iterrows()):
         if i >= max_filas:
             break
@@ -1194,6 +1231,104 @@ def _patch_chart_n_sensores(ruta_salida: str, n: int,
         contenido[chart_file] = xml.encode('utf-8')
 
     tmp = ruta_salida + '.chart.tmp'
+    with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zn:
+        for name, data in contenido.items():
+            zn.writestr(name, data)
+    os.replace(tmp, ruta_salida)
+
+
+def _serie_fallas_xml(idx: int, sheet: str, label_cell: str, label_text: str,
+                       x_range: str, y_range: str, color_hex: str, p: str = 'c:') -> str:
+    # `p` es el prefijo real del namespace del chart en ESTE archivo ('c:' o
+    # '' — ver _patch_chart_fallas). El namespace 'a:' (drawingml) siempre va
+    # prefijado, con o sin prefijo 'c:' en el resto del documento.
+    return (
+        f'<{p}ser>'
+        f'<{p}idx val="{idx}"/><{p}order val="{idx}"/>'
+        f'<{p}tx><{p}strRef><{p}f>\'{sheet}\'!{label_cell}</{p}f>'
+        f'<{p}strCache><{p}ptCount val="1"/>'
+        f'<{p}pt idx="0"><{p}v>{label_text}</{p}v></{p}pt>'
+        f'</{p}strCache></{p}strRef></{p}tx>'
+        # xmlns:a inline: en el estilo sin prefijo 'c:', el chart no declara
+        # xmlns:a en la raíz — cada <a:ln> lo redeclara localmente. Ponerlo
+        # aquí también es válido (aunque redundante) cuando sí está en la raíz.
+        f'<{p}spPr><a:ln xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+        f'w="28575" cap="rnd" cmpd="sng" algn="ctr">'
+        f'<a:solidFill><a:srgbClr val="{color_hex}"/></a:solidFill>'
+        f'<a:prstDash val="solid"/><a:round/></a:ln></{p}spPr>'
+        f'<{p}marker><{p}symbol val="none"/></{p}marker>'
+        f'<{p}xVal><{p}numRef><{p}f>\'{sheet}\'!{x_range}</{p}f>'
+        f'<{p}numCache><{p}formatCode>dd/mm/yyyy\\ hh:mm\\ AM/PM</{p}formatCode>'
+        f'<{p}ptCount val="0"/></{p}numCache></{p}numRef></{p}xVal>'
+        f'<{p}yVal><{p}numRef><{p}f>\'{sheet}\'!{y_range}</{p}f>'
+        f'<{p}numCache><{p}formatCode>0.00</{p}formatCode>'
+        f'<{p}ptCount val="0"/></{p}numCache></{p}numRef></{p}yVal>'
+        f'<{p}smooth val="1"/>'
+        f'</{p}ser>'
+    )
+
+
+def _patch_chart_fallas(ruta_salida: str, sheet_ft: str, sheet_fh: str,
+                         config: ProyectoConfig, tipo_plantilla: str,
+                         incluir_temp: bool, incluir_hum: bool) -> None:
+    """Reescribe las 2 series (falla + recuperación) de los gráficos de Fallas
+    Tem/HR (chart2/chart4) para que el número de puntos y las fechas
+    coincidan con el tipo de prueba real (PO: 30+30 · PP: 5+30), en vez de
+    quedarse con el reparto fijo que trae la plantilla subida."""
+    max_filas   = 60 if config.tipo_prueba == 'PO' else 35
+    fase1_filas = 30 if config.tipo_prueba == 'PO' else 5
+    label_fase1 = 'Corte de energía' if config.tipo_prueba == 'PO' else 'Apertura de puerta'
+    # Fila donde vive el rótulo de cada fase: depende de la plantilla subida
+    # (POA = filas 2/3, PPA = filas 1/2), igual que en _escribir_nombres_fallas.
+    fila_lbl_fase1, fila_lbl_fase2 = (2, 3) if tipo_plantilla == 'PO' else (1, 2)
+
+    r0    = FALLAS_ROW_START
+    r_mid = r0 + fase1_filas - 1   # última fila de la falla / primera de recuperación
+    r_end = r0 + max_filas - 1     # última fila del rango total
+
+    contenido: dict[str, bytes] = {}
+    with zipfile.ZipFile(ruta_salida, 'r') as zo:
+        for name in zo.namelist():
+            contenido[name] = zo.read(name)
+
+    charts_a_parchar = []
+    if incluir_temp and sheet_ft:
+        charts_a_parchar.append(('xl/charts/chart2.xml', sheet_ft))
+    if incluir_hum and sheet_fh:
+        charts_a_parchar.append(('xl/charts/chart4.xml', sheet_fh))
+
+    for chart_file, sheet in charts_a_parchar:
+        if chart_file not in contenido:
+            continue
+        xml = contenido[chart_file].decode('utf-8', errors='replace')
+
+        # openpyxl no siempre conserva el prefijo 'c:' del namespace del chart
+        # al reguardar el libro (a veces lo declara como namespace por
+        # defecto, sin prefijo) — hay que detectar cuál usa ESTE archivo en
+        # vez de asumir 'c:' siempre, o el reemplazo no encuentra nada.
+        p = 'c:' if re.search(r'<c:(chartSpace|ser)\b', xml) else ''
+
+        new_series = (
+            _serie_fallas_xml(0, sheet, f'$G${fila_lbl_fase1}', label_fase1,
+                               f'$B${r0}:$B${r_mid}', f'$C${r0}:$C${r_mid}', 'C00000', p=p) +
+            _serie_fallas_xml(1, sheet, f'$G${fila_lbl_fase2}', 'Recuperación',
+                               f'$B${r_mid}:$B${r_end}', f'$C${r_mid}:$C${r_end}', '92D050', p=p)
+        )
+
+        ser_open, ser_close = f'<{p}ser>', f'</{p}ser>'
+        if ser_open in xml:
+            xml = re.sub(re.escape(ser_open) + r'.*' + re.escape(ser_close),
+                         lambda _m: new_series, xml, count=1, flags=re.DOTALL)
+        else:
+            for base in ('scatterChart', 'lineChart', 'barChart'):
+                anchor = f'</{p}{base}>'
+                if anchor in xml:
+                    xml = xml.replace(anchor, new_series + anchor, 1)
+                    break
+
+        contenido[chart_file] = xml.encode('utf-8')
+
+    tmp = ruta_salida + '.chartfallas.tmp'
     with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zn:
         for name, data in contenido.items():
             zn.writestr(name, data)
